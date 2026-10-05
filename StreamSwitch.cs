@@ -39,8 +39,23 @@ namespace StreamSwitch {
             return Json(new { op = 2, d = new { token = token, compress = false,
                 properties = new { os = "Windows", browser = "StreamSwitch", device = "StreamSwitch" } } });
         }
-        public static string Presence(bool active, string title, string url) {
-            object[] activities = active ? new object[] { new { name = Title(title), type = 1, url = StreamUrl(url) } } : new object[0];
+        public static string ImageUrl(string value) {
+            if (String.IsNullOrWhiteSpace(value)) return "";
+            Uri uri;
+            if (value.Length > 2048 || !Uri.TryCreate(value.Trim(), UriKind.Absolute, out uri) ||
+                uri.Scheme != "https" || !String.IsNullOrEmpty(uri.UserInfo) || !uri.IsDefaultPort ||
+                uri.IsLoopback || uri.HostNameType != UriHostNameType.Dns || !uri.Host.Contains(".") || uri.Host.EndsWith(".local"))
+                throw new ArgumentException("La imagen necesita un enlace HTTPS público, no un archivo de tu PC.");
+            return uri.AbsoluteUri;
+        }
+        public static string Presence(bool active, string title, string url, string imageUrl = "") {
+            object[] activities = new object[0];
+            if (active) {
+                var activity = new Dictionary<string, object> { { "name", Title(title) }, { "type", 1 }, { "url", StreamUrl(url) } };
+                string image = ImageUrl(imageUrl);
+                if (image.Length > 0) activity["assets"] = new { large_image = image, large_text = Title(title) };
+                activities = new object[] { activity };
+            }
             return Json(new { op = 3, d = new { since = (object)null, activities = activities, status = "online", afk = false } });
         }
         public static string CloseMessage(int code) {
@@ -190,11 +205,11 @@ namespace StreamSwitch {
                 }
             } finally { sendLock.Release(); }
         }
-        public async Task SetPresence(bool value, string title, string url) {
+        public async Task SetPresence(bool value, string title, string url, string imageUrl = "") {
             if (!Connected) throw new GatewayException("Conecta primero con Discord.");
             if ((DateTime.UtcNow - lastPresence).TotalSeconds < 6)
                 throw new GatewayException("Espera unos segundos antes del siguiente cambio.");
-            string payload = Protocol.Presence(value, title, url);
+            string payload = Protocol.Presence(value, title, url, imageUrl);
             try {
                 await Send(payload).ConfigureAwait(false);
                 active = value;
@@ -235,7 +250,9 @@ namespace StreamSwitch {
         static readonly Color Card = Color.FromArgb(24, 27, 39);
         static readonly Color Muted = Color.FromArgb(169, 177, 197);
         static readonly Color Purple = Color.FromArgb(141, 94, 255);
-        readonly TextBox token = Input(true), title = Input(false), url = Input(false);
+        readonly TextBox token = Input(true), title = Input(false), url = Input(false), imageUrl = Input(false);
+        readonly PictureBox picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(35, 39, 54), Margin = new Padding(0, 4, 0, 8) };
+        readonly Button loadImage = Button("Ver imagen", Color.FromArgb(49, 54, 72));
         readonly Label connection = Label("DESCONECTADO", 10, Muted);
         readonly Label account = Label("Tu cuenta de Discord", 17, Color.White);
         readonly Label previewTitle = Label("Mi directo", 14, Color.White);
@@ -251,9 +268,9 @@ namespace StreamSwitch {
         bool busy, closing;
         DateTime nextChange = DateTime.MinValue;
         public MainForm() {
-            Text = "StreamSwitch";
-            ClientSize = new Size(1000, 800);
-            MinimumSize = new Size(940, 830);
+            Text = "StreamSwitch · Imagen";
+            ClientSize = new Size(1000, 860);
+            MinimumSize = new Size(940, 890);
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Bg;
@@ -273,8 +290,8 @@ namespace StreamSwitch {
             var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             root.Controls.Add(columns, 0, 1);
-            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 11, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
-            int[] heights = { 35, 25, 38, 42, 33, 25, 38, 25, 38, 54 };
+            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 14, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
+            int[] heights = { 35, 25, 38, 42, 33, 25, 38, 25, 38, 25, 38, 50, 54 };
             for (int i = 0; i < heights.Length; i++) form.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
             form.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             form.Controls.Add(Label("01   CONEXIÓN Y ESTADO", 10, Muted), 0, 0);
@@ -286,29 +303,39 @@ namespace StreamSwitch {
             form.Controls.Add(title, 0, 6); title.AccessibleName = "Título del streaming"; title.MaxLength = 128; title.Text = "Mi directo";
             form.Controls.Add(Label("Enlace de Twitch o YouTube", 10, Color.White), 0, 7);
             form.Controls.Add(url, 0, 8); url.AccessibleName = "Enlace del streaming"; url.MaxLength = 512;
+            form.Controls.Add(Label("Imagen de la actividad (opcional)", 10, Color.White), 0, 9);
+            var imageRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            imageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); imageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106));
+            imageRow.Controls.Add(imageUrl, 0, 0); imageRow.Controls.Add(loadImage, 1, 0);
+            imageUrl.AccessibleName = "Enlace público de la imagen"; imageUrl.MaxLength = 2048;
+            form.Controls.Add(imageRow, 0, 10);
+            form.Controls.Add(Label("Pega el enlace directo de una imagen pública.\nDéjalo vacío para usar el icono por defecto.", 9, Muted), 0, 11);
             var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 12, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
-            actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 9);
+            actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 12);
             columns.Controls.Add(form, 0, 0);
-            var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 9, BackColor = Card, Padding = new Padding(24), Margin = Padding.Empty };
-            int[] pHeights = { 36, 36, 50, 48, 31, 54, 42, 70 };
+            var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 10, BackColor = Card, Padding = new Padding(24), Margin = Padding.Empty };
+            int[] pHeights = { 30, 30, 42, 36, 116, 31, 48, 36, 68 };
             for (int i = 0; i < pHeights.Length; i++) preview.RowStyles.Add(new RowStyle(SizeType.Absolute, pHeights[i]));
             preview.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             preview.Controls.Add(Label("02   VISTA PREVIA", 10, Muted), 0, 0);
             preview.Controls.Add(connection, 0, 1);
             preview.Controls.Add(account, 0, 2);
             var icon = Label("●  STREAMING", 17, Purple); preview.Controls.Add(icon, 0, 3);
-            preview.Controls.Add(activityState, 0, 4);
-            preview.Controls.Add(previewTitle, 0, 5);
-            preview.Controls.Add(previewUrl, 0, 6);
-            preview.Controls.Add(Label("La vista previa es orientativa. Enviar el estado no confirma que Discord muestre el icono morado.", 10, Muted), 0, 7);
-            preview.Controls.Add(Label("Al activar o quitar el estado, esta sesión pasa a «En línea».", 9, Muted), 0, 8);
+            preview.Controls.Add(picture, 0, 4);
+            preview.Controls.Add(activityState, 0, 5);
+            preview.Controls.Add(previewTitle, 0, 6);
+            preview.Controls.Add(previewUrl, 0, 7);
+            preview.Controls.Add(Label("La vista previa es orientativa. Discord puede ignorar la imagen o tardar en actualizarla.", 10, Muted), 0, 8);
+            preview.Controls.Add(Label("Al activar o quitar el estado, esta sesión pasa a «En línea».", 9, Muted), 0, 9);
             columns.Controls.Add(preview, 1, 0);
             var notice = Label("CONEXIÓN NO OFICIAL\nAutomatizar una cuenta personal infringe las normas de Discord y puede provocar su suspensión.", 10, Color.FromArgb(235, 190, 121));
             notice.Margin = new Padding(0, 18, 0, 0); root.Controls.Add(notice, 0, 2);
             status.Padding = new Padding(0, 8, 0, 0); root.Controls.Add(status, 0, 3);
             title.TextChanged += delegate { previewTitle.Text = title.Text.Trim().Length == 0 ? "Mi directo" : title.Text; };
             url.TextChanged += delegate { previewUrl.Text = url.Text.Trim().Length == 0 ? "twitch.tv / youtube.com" : url.Text; };
+            imageUrl.TextChanged += delegate { var old = picture.Image; picture.Image = null; if (old != null) old.Dispose(); };
+            loadImage.Click += async delegate { await LoadImage(); };
             connect.Click += async delegate { await ConnectClicked(); };
             activate.Click += async delegate { await ChangePresence(true); };
             deactivate.Click += async delegate { await ChangePresence(false); };
@@ -337,6 +364,42 @@ namespace StreamSwitch {
             if (!connected) { connection.Text = busy ? "CONECTANDO…" : "DESCONECTADO"; connection.ForeColor = Muted; }
         }
         void ShowStatus(string text, bool error) { status.Text = text; status.ForeColor = error ? Color.FromArgb(255, 164, 164) : Muted; }
+        async Task LoadImage() {
+            loadImage.Enabled = false;
+            string selected = imageUrl.Text;
+            try {
+                string address = Protocol.ImageUrl(selected);
+                if (address.Length == 0) { ShowStatus("Pega primero el enlace directo de una imagen.", false); return; }
+                ShowStatus("Cargando la vista previa…", false);
+                var request = (HttpWebRequest)WebRequest.Create(address);
+                request.AllowAutoRedirect = false;
+                request.UseDefaultCredentials = false;
+                using (var timeout = new CancellationTokenSource(10000))
+                using (timeout.Token.Register(request.Abort))
+                using (var response = (HttpWebResponse)await request.GetResponseAsync()) {
+                    if (response.StatusCode != HttpStatusCode.OK || !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                        throw new ArgumentException("El enlace debe abrir directamente una imagen, no una página web.");
+                    if (response.ContentLength > 5 * 1024 * 1024) throw new ArgumentException("Para la vista previa, usa una imagen de menos de 5 MB.");
+                    using (var source = response.GetResponseStream())
+                    using (var memory = new MemoryStream()) {
+                        var buffer = new byte[8192]; int count;
+                        while ((count = await source.ReadAsync(buffer, 0, buffer.Length, timeout.Token)) > 0) {
+                            if (memory.Length + count > 5 * 1024 * 1024) throw new ArgumentException("Para la vista previa, usa una imagen de menos de 5 MB.");
+                            memory.Write(buffer, 0, count);
+                        }
+                        memory.Position = 0;
+                        using (var decoded = Image.FromStream(memory)) {
+                            if (decoded.Width > 4096 || decoded.Height > 4096) throw new ArgumentException("Usa una imagen de hasta 4096 × 4096 píxeles.");
+                            if (closing || imageUrl.Text != selected) return;
+                            var old = picture.Image; picture.Image = new Bitmap(decoded); if (old != null) old.Dispose();
+                        }
+                    }
+                }
+                ShowStatus("Vista previa cargada. Pulsa Activar streaming para enviar también la imagen.", false);
+            } catch (Exception ex) {
+                if (!closing && imageUrl.Text == selected) ShowStatus(ex is ArgumentException ? ex.Message : "No se pudo cargar la imagen. Prueba un enlace directo a PNG, JPG o GIF.", true);
+            } finally { if (!IsDisposed) loadImage.Enabled = true; }
+        }
         async Task ConnectClicked() {
             busy = true; UpdateButtons();
             try {
@@ -374,7 +437,7 @@ namespace StreamSwitch {
             busy = true; UpdateButtons();
             try {
                 if (session == null) throw new GatewayException("Conecta primero con Discord.");
-                await session.SetPresence(active, title.Text, url.Text);
+                await session.SetPresence(active, title.Text, url.Text, imageUrl.Text);
                 nextChange = DateTime.UtcNow.AddSeconds(6);
                 activityState.Text = active ? "SOLICITUD ENVIADA · SIN VERIFICAR" : "RETIRADA SOLICITADA";
                 ShowStatus(active ? "Estado enviado. Comprueba el icono desde otra cuenta; Discord no confirma su visualización." : "Retirada enviada. Tu sesión queda en línea.", false);
@@ -388,10 +451,11 @@ namespace StreamSwitch {
                 var saved = Protocol.Read(File.ReadAllText(settingsPath));
                 title.Text = Protocol.Title(Convert.ToString(saved["title"]));
                 url.Text = Protocol.StreamUrl(Convert.ToString(saved["url"]));
+                if (saved.ContainsKey("imageUrl")) imageUrl.Text = Protocol.ImageUrl(Convert.ToString(saved["imageUrl"]));
             } catch { }
         }
         void SavePreferences() {
-            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim() }), Encoding.UTF8); }
+            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim(), imageUrl = imageUrl.Text.Trim() }), Encoding.UTF8); }
             catch { ShowStatus(status.Text + " No se han podido guardar el título y el enlace.", false); }
         }
         async void OnClosing(object sender, FormClosingEventArgs e) {
@@ -409,6 +473,13 @@ namespace StreamSwitch {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (args.Contains("--self-test")) return SelfTests.Run(args.Length > 1 ? args[1] : "tests.txt");
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            if (args.Contains("--preview")) {
+                using (var preview = new MainForm()) {
+                    preview.Show(); Application.DoEvents();
+                    using (var bitmap = new Bitmap(preview.Width, preview.Height)) { preview.DrawToBitmap(bitmap, new Rectangle(0, 0, preview.Width, preview.Height)); bitmap.Save(args[1]); }
+                }
+                return 0;
+            }
             bool created;
             using (var mutex = new Mutex(true, "Local\\StreamSwitch-Personal", out created)) {
                 if (!created) { MessageBox.Show("StreamSwitch ya está abierto.", "StreamSwitch"); return 0; }

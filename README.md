@@ -1,16 +1,15 @@
-﻿# StreamSwitch v1.0.0 — Initial presence controls
+﻿# StreamSwitch v2.0.0 — Image URL and local preview
 
 Developed by **Oxigeno**.
 
 ## Changes
 
-- Initial Spanish interface with title and Twitch/YouTube link.
-- Connect, enable streaming, remove status, and disconnect controls.
-- In-memory token handling and a cooldown between presence changes.
+- Adds an optional public image URL and a local image preview.
+- Adds image validation and saves the non-secret image URL in preferences.
 
 ## Limitations
 
-No custom activity image or small logo.
+Known limitation: the local preview worked, but directly submitted external image URLs did not appear in Discord in the observed test. Superseded by v3 image conversion.
 
 ## Download and run
 

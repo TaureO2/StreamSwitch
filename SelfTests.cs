@@ -67,12 +67,22 @@ namespace StreamSwitch {
             Check(Convert.ToString(Protocol.Map(activities[0])["name"]) == "Sesión \"especial\" ñ", "Unicode and quotes survive encoding");
             var off = Protocol.Map(Protocol.Read(Protocol.Presence(false, "", ""))["d"]);
             Check(((System.Collections.ArrayList)off["activities"]).Count == 0, "Removal uses empty activities");
+            Check(!Protocol.Map(activities[0]).ContainsKey("assets"), "Empty image keeps existing streaming payload");
+            Check(Protocol.ImageUrl("   ") == "", "Image is optional");
+            var withImage = Protocol.Map(Protocol.Read(Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png?size=512"))["d"]);
+            var activityWithImage = Protocol.Map(((System.Collections.ArrayList)withImage["activities"])[0]);
+            Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_image"]) == "https://example.com/photo.png?size=512", "Image URL and query are included in large_image");
+            Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_text"]) == "Mi directo", "Image hover text follows title");
+            foreach (var badImage in new[] { "C:\\photo.png", "file:///C:/photo.png", "http://example.com/photo.png", "https://user:secret@example.com/photo.png", "https://localhost/photo.png", "https://127.0.0.1/photo.png" })
+                Reject(() => Protocol.ImageUrl(badImage), "Non-public or insecure image rejected: " + badImage);
+            Check(!Protocol.Presence(false, "", "", "invalid").Contains("assets"), "Clearing ignores image and removes activity");
             var transport = new FakeTransport();
             using (var session = new Session(transport)) {
                 Check(await session.Start("FAKE_TEST_CREDENTIAL") == "test-user", "READY confirms the account name");
                 Check(session.Connected, "Connected after READY");
                 Check(!transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3), "Connecting does not publish a presence");
-                await session.SetPresence(true, "Mi directo", "https://twitch.tv/example");
+                await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png");
+                Check(transport.Sent.Any(s => s.Contains("large_image") && s.Contains("https://example.com/photo.png")), "Session transmits configured image");
                 Check(session.Active, "Presence send changes local state");
                 await RejectAsync(() => session.SetPresence(false, "", ""), "Rapid presence change is limited");
                 await Until(() => transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 1));
