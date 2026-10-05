@@ -7,6 +7,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace StreamSwitch {
+    internal sealed class FakeImageAssets : IImageAssets {
+        public bool Fail;
+        public string LastUrl, LastApplication;
+        public Task<string> Resolve(string token, string applicationId, string imageUrl, CancellationToken ct) {
+            ImageAssets.ApplicationId(applicationId);
+            LastUrl = Protocol.ImageUrl(imageUrl); LastApplication = applicationId;
+            if (Fail) throw new GatewayException("Simulated asset failure");
+            return Task.FromResult("mp:external/test/https/example.com/photo.png");
+        }
+    }
     internal sealed class FakeTransport : ITransport {
         readonly BlockingCollection<string> incoming = new BlockingCollection<string>();
         public readonly ConcurrentQueue<string> Sent = new ConcurrentQueue<string>();
@@ -69,20 +79,30 @@ namespace StreamSwitch {
             Check(((System.Collections.ArrayList)off["activities"]).Count == 0, "Removal uses empty activities");
             Check(!Protocol.Map(activities[0]).ContainsKey("assets"), "Empty image keeps existing streaming payload");
             Check(Protocol.ImageUrl("   ") == "", "Image is optional");
-            var withImage = Protocol.Map(Protocol.Read(Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png?size=512"))["d"]);
+            var withImage = Protocol.Map(Protocol.Read(Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "mp:external/test/https/example.com/photo.png", "123456789012345678"))["d"]);
             var activityWithImage = Protocol.Map(((System.Collections.ArrayList)withImage["activities"])[0]);
-            Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_image"]) == "https://example.com/photo.png?size=512", "Image URL and query are included in large_image");
+            Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_image"]) == "mp:external/test/https/example.com/photo.png", "Converted media proxy asset is included in large_image");
+            Check(Convert.ToString(activityWithImage["application_id"]) == "123456789012345678", "Application ID accompanies external image");
+            Reject(() => Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png"), "Raw external URL cannot be sent as an asset");
+            Check(ImageAssets.ParseResponse("[{\"external_asset_path\":\"external/hash/https/example.com/image.png\"}]") == "mp:external/hash/https/example.com/image.png", "External asset response gets mp prefix");
+            await RejectAsync(() => { ImageAssets.ParseResponse("[]"); return Task.FromResult(0); }, "Empty asset response rejected");
+            await RejectAsync(() => { ImageAssets.ParseResponse("[{\"external_asset_path\":\"https://example.com/image.png\"}]"); return Task.FromResult(0); }, "Malformed asset response rejected");
+            Reject(() => ImageAssets.ApplicationId(""), "Missing application ID is explained");
+            Check(ImageAssets.DirectAsset("https://cdn.discordapp.com/attachments/123/456/image.png?ex=abc") == "mp:attachments/123/456/image.png?ex=abc", "Discord CDN URL converts directly and retains parameters");
+            Check(ImageAssets.DirectAsset("https://i.postimg.cc/example/image.png") == null, "External host requires conversion");
             Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_text"]) == "Mi directo", "Image hover text follows title");
             foreach (var badImage in new[] { "C:\\photo.png", "file:///C:/photo.png", "http://example.com/photo.png", "https://user:secret@example.com/photo.png", "https://localhost/photo.png", "https://127.0.0.1/photo.png" })
                 Reject(() => Protocol.ImageUrl(badImage), "Non-public or insecure image rejected: " + badImage);
             Check(!Protocol.Presence(false, "", "", "invalid").Contains("assets"), "Clearing ignores image and removes activity");
             var transport = new FakeTransport();
-            using (var session = new Session(transport)) {
+            var assetResolver = new FakeImageAssets();
+            using (var session = new Session(transport, assetResolver)) {
                 Check(await session.Start("FAKE_TEST_CREDENTIAL") == "test-user", "READY confirms the account name");
                 Check(session.Connected, "Connected after READY");
                 Check(!transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3), "Connecting does not publish a presence");
-                await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png");
-                Check(transport.Sent.Any(s => s.Contains("large_image") && s.Contains("https://example.com/photo.png")), "Session transmits configured image");
+                await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png", "123456789012345678");
+                Check(transport.Sent.Any(s => s.Contains("large_image") && s.Contains("mp:external/test/https/example.com/photo.png")), "Session sends converted image instead of raw URL");
+                Check(assetResolver.LastApplication == "123456789012345678" && assetResolver.LastUrl == "https://example.com/photo.png", "Session resolves the selected image with the selected application");
                 Check(session.Active, "Presence send changes local state");
                 await RejectAsync(() => session.SetPresence(false, "", ""), "Rapid presence change is limited");
                 await Until(() => transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 1));
@@ -104,6 +124,13 @@ namespace StreamSwitch {
                 await session.Start("FAKE_TEST_CREDENTIAL");
                 await RejectAsync(() => session.SetPresence(true, "Mi directo", "https://twitch.tv/example"), "Send failure is reported");
                 Check(!session.Connected, "Send failure clears connected state");
+            }
+            var failedAssetTransport = new FakeTransport();
+            using (var session = new Session(failedAssetTransport, new FakeImageAssets { Fail = true })) {
+                await session.Start("FAKE_TEST_CREDENTIAL");
+                await RejectAsync(() => session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png", "123456789012345678"), "Asset error is returned before presence send");
+                Check(session.Connected, "Asset error preserves the working connection");
+                Check(!failedAssetTransport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3), "Failed conversion does not silently send broken image");
             }
             var reconnectTransport = new FakeTransport();
             using (var session = new Session(reconnectTransport)) {

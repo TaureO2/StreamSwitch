@@ -48,12 +48,16 @@ namespace StreamSwitch {
                 throw new ArgumentException("La imagen necesita un enlace HTTPS público, no un archivo de tu PC.");
             return uri.AbsoluteUri;
         }
-        public static string Presence(bool active, string title, string url, string imageUrl = "") {
+        public static string Presence(bool active, string title, string url, string imageUrl = "", string applicationId = "") {
             object[] activities = new object[0];
             if (active) {
                 var activity = new Dictionary<string, object> { { "name", Title(title) }, { "type", 1 }, { "url", StreamUrl(url) } };
-                string image = ImageUrl(imageUrl);
-                if (image.Length > 0) activity["assets"] = new { large_image = image, large_text = Title(title) };
+                if (!String.IsNullOrEmpty(imageUrl)) {
+                    if (!imageUrl.StartsWith("mp:") || imageUrl.Length > 2051 || imageUrl.Any(Char.IsControl))
+                        throw new ArgumentException("La imagen aún no se ha preparado como recurso de Discord.");
+                    activity["assets"] = new { large_image = imageUrl, large_text = Title(title) };
+                    if (!String.IsNullOrWhiteSpace(applicationId)) activity["application_id"] = ImageAssets.ApplicationId(applicationId);
+                }
                 activities = new object[] { activity };
             }
             return Json(new { op = 3, d = new { since = (object)null, activities = activities, status = "online", afk = false } });
@@ -111,6 +115,8 @@ namespace StreamSwitch {
     }
     internal sealed class Session : IDisposable {
         readonly ITransport transport;
+        readonly IImageAssets imageAssets;
+        string sessionToken;
         readonly CancellationTokenSource lifetime = new CancellationTokenSource();
         readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1);
         readonly TaskCompletionSource<string> ready = new TaskCompletionSource<string>();
@@ -125,11 +131,12 @@ namespace StreamSwitch {
         public event Action<string> Disconnected;
         public bool Connected { get; private set; }
         public bool Active { get { return active; } }
-        public Session(ITransport transport) { this.transport = transport; }
+        public Session(ITransport transport, IImageAssets imageAssets = null) { this.transport = transport; this.imageAssets = imageAssets ?? new ImageAssets(); }
         public async Task<string> Start(string token) {
             if (String.IsNullOrWhiteSpace(token) || token.Length > 2048 || token.Any(Char.IsWhiteSpace))
                 throw new ArgumentException("Introduce tu token personal, sin espacios ni comillas.");
             try {
+                sessionToken = token;
                 using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token)) {
                     timeout.CancelAfter(20000);
                     await transport.Connect(timeout.Token).ConfigureAwait(false);
@@ -205,11 +212,16 @@ namespace StreamSwitch {
                 }
             } finally { sendLock.Release(); }
         }
-        public async Task SetPresence(bool value, string title, string url, string imageUrl = "") {
+        public async Task SetPresence(bool value, string title, string url, string imageUrl = "", string applicationId = "") {
             if (!Connected) throw new GatewayException("Conecta primero con Discord.");
             if ((DateTime.UtcNow - lastPresence).TotalSeconds < 6)
                 throw new GatewayException("Espera unos segundos antes del siguiente cambio.");
-            string payload = Protocol.Presence(value, title, url, imageUrl);
+            string asset = "";
+            if (value) {
+                Protocol.Title(title); Protocol.StreamUrl(url);
+                if (!String.IsNullOrWhiteSpace(imageUrl)) asset = await imageAssets.Resolve(sessionToken, applicationId, imageUrl, lifetime.Token).ConfigureAwait(false);
+            }
+            string payload = Protocol.Presence(value, title, url, asset, applicationId);
             try {
                 await Send(payload).ConfigureAwait(false);
                 active = value;
@@ -235,6 +247,7 @@ namespace StreamSwitch {
         void Stop(string error) {
             if (Interlocked.Exchange(ref stopped, 1) != 0) return;
             Connected = false;
+            sessionToken = null;
             active = false;
             lifetime.Cancel();
             transport.Dispose();
@@ -250,7 +263,7 @@ namespace StreamSwitch {
         static readonly Color Card = Color.FromArgb(24, 27, 39);
         static readonly Color Muted = Color.FromArgb(169, 177, 197);
         static readonly Color Purple = Color.FromArgb(141, 94, 255);
-        readonly TextBox token = Input(true), title = Input(false), url = Input(false), imageUrl = Input(false);
+        readonly TextBox token = Input(true), title = Input(false), url = Input(false), imageUrl = Input(false), applicationId = Input(false);
         readonly PictureBox picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(35, 39, 54), Margin = new Padding(0, 4, 0, 8) };
         readonly Button loadImage = Button("Ver imagen", Color.FromArgb(49, 54, 72));
         readonly Label connection = Label("DESCONECTADO", 10, Muted);
@@ -268,7 +281,7 @@ namespace StreamSwitch {
         bool busy, closing;
         DateTime nextChange = DateTime.MinValue;
         public MainForm() {
-            Text = "StreamSwitch · Imagen";
+            Text = "StreamSwitch · Imagen v3";
             ClientSize = new Size(1000, 860);
             MinimumSize = new Size(940, 890);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -290,8 +303,8 @@ namespace StreamSwitch {
             var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             root.Controls.Add(columns, 0, 1);
-            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 14, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
-            int[] heights = { 35, 25, 38, 42, 33, 25, 38, 25, 38, 25, 38, 50, 54 };
+            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 16, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
+            int[] heights = { 30, 23, 34, 35, 32, 23, 34, 23, 34, 23, 36, 37, 23, 34, 48 };
             for (int i = 0; i < heights.Length; i++) form.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
             form.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             form.Controls.Add(Label("01   CONEXIÓN Y ESTADO", 10, Muted), 0, 0);
@@ -310,9 +323,11 @@ namespace StreamSwitch {
             imageUrl.AccessibleName = "Enlace público de la imagen"; imageUrl.MaxLength = 2048;
             form.Controls.Add(imageRow, 0, 10);
             form.Controls.Add(Label("Pega el enlace directo de una imagen pública.\nDéjalo vacío para usar el icono por defecto.", 9, Muted), 0, 11);
+            form.Controls.Add(Label("Application ID para imágenes externas", 10, Color.White), 0, 12);
+            form.Controls.Add(applicationId, 0, 13); applicationId.MaxLength = 20; applicationId.AccessibleName = "Application ID público de tu aplicación Discord";
             var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 12, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
-            actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 12);
+            actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 14);
             columns.Controls.Add(form, 0, 0);
             var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 10, BackColor = Card, Padding = new Padding(24), Margin = Padding.Empty };
             int[] pHeights = { 30, 30, 42, 36, 116, 31, 48, 36, 68 };
@@ -437,7 +452,8 @@ namespace StreamSwitch {
             busy = true; UpdateButtons();
             try {
                 if (session == null) throw new GatewayException("Conecta primero con Discord.");
-                await session.SetPresence(active, title.Text, url.Text, imageUrl.Text);
+                ShowStatus(active && imageUrl.Text.Trim().Length > 0 ? "Preparando la imagen en Discord…" : "Enviando el estado…", false);
+                await session.SetPresence(active, title.Text, url.Text, imageUrl.Text, applicationId.Text);
                 nextChange = DateTime.UtcNow.AddSeconds(6);
                 activityState.Text = active ? "SOLICITUD ENVIADA · SIN VERIFICAR" : "RETIRADA SOLICITADA";
                 ShowStatus(active ? "Estado enviado. Comprueba el icono desde otra cuenta; Discord no confirma su visualización." : "Retirada enviada. Tu sesión queda en línea.", false);
@@ -452,10 +468,11 @@ namespace StreamSwitch {
                 title.Text = Protocol.Title(Convert.ToString(saved["title"]));
                 url.Text = Protocol.StreamUrl(Convert.ToString(saved["url"]));
                 if (saved.ContainsKey("imageUrl")) imageUrl.Text = Protocol.ImageUrl(Convert.ToString(saved["imageUrl"]));
+                if (saved.ContainsKey("applicationId")) applicationId.Text = Convert.ToString(saved["applicationId"]);
             } catch { }
         }
         void SavePreferences() {
-            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim(), imageUrl = imageUrl.Text.Trim() }), Encoding.UTF8); }
+            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim(), imageUrl = imageUrl.Text.Trim(), applicationId = applicationId.Text.Trim() }), Encoding.UTF8); }
             catch { ShowStatus(status.Text + " No se han podido guardar el título y el enlace.", false); }
         }
         async void OnClosing(object sender, FormClosingEventArgs e) {

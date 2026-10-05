@@ -1,15 +1,16 @@
-﻿# StreamSwitch v2.0.0 — Image URL and local preview
+﻿# StreamSwitch v3.0.0 — Discord image asset conversion
 
 Developed by **Oxigeno**.
 
 ## Changes
 
-- Adds an optional public image URL and a local image preview.
-- Adds image validation and saves the non-secret image URL in preferences.
+- Adds a public Application ID field for external images.
+- Converts external images into Discord assets before sending presence.
+- Reports image conversion failures while preserving the connection.
 
 ## Limitations
 
-Known limitation: the local preview worked, but directly submitted external image URLs did not appear in Discord in the observed test. Superseded by v3 image conversion.
+External image conversion uses an unofficial endpoint and may be rejected or change. Duplicate title text and small badges are addressed in later versions.
 
 ## Download and run
 
