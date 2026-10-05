@@ -1,16 +1,16 @@
-﻿# StreamSwitch v3.0.0 — Discord image asset conversion
+﻿# StreamSwitch v4.0.0 — Single title and Twitch badge
 
 Developed by **Oxigeno**.
 
 ## Changes
 
-- Adds a public Application ID field for external images.
-- Converts external images into Discord assets before sending presence.
-- Reports image conversion failures while preserving the connection.
+- Sends the custom title once in activity details, with the platform as the activity name.
+- Removes redundant image text.
+- Adds an optional small Twitch badge over the main activity image.
 
 ## Limitations
 
-External image conversion uses an unofficial endpoint and may be rejected or change. Duplicate title text and small badges are addressed in later versions.
+Only the Twitch badge is available. Discord controls the final overlay size and position.
 
 ## Download and run
 

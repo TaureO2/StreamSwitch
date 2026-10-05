@@ -13,11 +13,12 @@ namespace StreamSwitch {
         Task<string> Resolve(string token, string applicationId, string imageUrl, CancellationToken ct);
     }
     internal sealed class ImageAssets : IImageAssets {
+        public const string TwitchIconUrl = "https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png";
         readonly Dictionary<string, string> cache = new Dictionary<string, string>();
         public static string ApplicationId(string value) {
             value = (value ?? "").Trim();
             if (value.Length < 17 || value.Length > 20 || value.Any(c => c < '0' || c > '9'))
-                throw new ArgumentException("Para imágenes de Postimages, introduce el Application ID de una aplicación tuya de Discord.");
+                throw new ArgumentException("Para imágenes externas y el logo de Twitch, introduce el Application ID de una aplicación tuya de Discord.");
             return value;
         }
         public static string DirectAsset(string imageUrl) {

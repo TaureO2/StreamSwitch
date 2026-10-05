@@ -10,11 +10,13 @@ namespace StreamSwitch {
     internal sealed class FakeImageAssets : IImageAssets {
         public bool Fail;
         public string LastUrl, LastApplication;
+        public readonly List<string> Urls = new List<string>();
         public Task<string> Resolve(string token, string applicationId, string imageUrl, CancellationToken ct) {
             ImageAssets.ApplicationId(applicationId);
             LastUrl = Protocol.ImageUrl(imageUrl); LastApplication = applicationId;
+            Urls.Add(imageUrl);
             if (Fail) throw new GatewayException("Simulated asset failure");
-            return Task.FromResult("mp:external/test/https/example.com/photo.png");
+            return Task.FromResult(imageUrl == ImageAssets.TwitchIconUrl ? "mp:external/test/twitch.png" : "mp:external/test/https/example.com/photo.png");
         }
     }
     internal sealed class FakeTransport : ITransport {
@@ -74,7 +76,8 @@ namespace StreamSwitch {
             var payload = Protocol.Map(Protocol.Read(Protocol.Presence(true, "Sesión \"especial\" ñ", "https://twitch.tv/example"))["d"]);
             var activities = (System.Collections.ArrayList)payload["activities"];
             Check(Convert.ToInt32(Protocol.Map(activities[0])["type"]) == 1, "Streaming activity type is 1");
-            Check(Convert.ToString(Protocol.Map(activities[0])["name"]) == "Sesión \"especial\" ñ", "Unicode and quotes survive encoding");
+            Check(Convert.ToString(Protocol.Map(activities[0])["details"]) == "Sesión \"especial\" ñ", "Unicode and quotes survive encoding in title details");
+            Check(Convert.ToString(Protocol.Map(activities[0])["name"]) == "Twitch", "Platform name is separate from title");
             var off = Protocol.Map(Protocol.Read(Protocol.Presence(false, "", ""))["d"]);
             Check(((System.Collections.ArrayList)off["activities"]).Count == 0, "Removal uses empty activities");
             Check(!Protocol.Map(activities[0]).ContainsKey("assets"), "Empty image keeps existing streaming payload");
@@ -90,7 +93,13 @@ namespace StreamSwitch {
             Reject(() => ImageAssets.ApplicationId(""), "Missing application ID is explained");
             Check(ImageAssets.DirectAsset("https://cdn.discordapp.com/attachments/123/456/image.png?ex=abc") == "mp:attachments/123/456/image.png?ex=abc", "Discord CDN URL converts directly and retains parameters");
             Check(ImageAssets.DirectAsset("https://i.postimg.cc/example/image.png") == null, "External host requires conversion");
-            Check(Convert.ToString(Protocol.Map(activityWithImage["assets"])["large_text"]) == "Mi directo", "Image hover text follows title");
+            Check(!Protocol.Map(activityWithImage["assets"]).ContainsKey("large_text"), "Image hover text does not repeat title");
+            var badgePayload = Protocol.Read(Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "mp:external/image", "123456789012345678", "mp:external/twitch"));
+            var badgeActivity = Protocol.Map(((System.Collections.ArrayList)Protocol.Map(badgePayload["d"])["activities"])[0]);
+            Check(Convert.ToString(Protocol.Map(badgeActivity["assets"])["small_image"]) == "mp:external/twitch", "Twitch badge occupies small_image");
+            Check(Convert.ToString(Protocol.Map(badgeActivity["assets"])["small_text"]) == "Twitch", "Badge label identifies Twitch");
+            Check(Protocol.Json(badgePayload).Split(new[] { "Mi directo" }, StringSplitOptions.None).Length == 2, "Custom title occurs only once in activity payload");
+            Check(!Protocol.Map(activityWithImage["assets"]).ContainsKey("small_image"), "Badge may be omitted independently");
             foreach (var badImage in new[] { "C:\\photo.png", "file:///C:/photo.png", "http://example.com/photo.png", "https://user:secret@example.com/photo.png", "https://localhost/photo.png", "https://127.0.0.1/photo.png" })
                 Reject(() => Protocol.ImageUrl(badImage), "Non-public or insecure image rejected: " + badImage);
             Check(!Protocol.Presence(false, "", "", "invalid").Contains("assets"), "Clearing ignores image and removes activity");
@@ -102,7 +111,9 @@ namespace StreamSwitch {
                 Check(!transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3), "Connecting does not publish a presence");
                 await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png", "123456789012345678");
                 Check(transport.Sent.Any(s => s.Contains("large_image") && s.Contains("mp:external/test/https/example.com/photo.png")), "Session sends converted image instead of raw URL");
-                Check(assetResolver.LastApplication == "123456789012345678" && assetResolver.LastUrl == "https://example.com/photo.png", "Session resolves the selected image with the selected application");
+                Check(assetResolver.LastApplication == "123456789012345678" && assetResolver.Urls.Contains("https://example.com/photo.png"), "Session resolves the selected image with the selected application");
+                Check(assetResolver.Urls.Contains(ImageAssets.TwitchIconUrl), "Session resolves the official Twitch icon");
+                Check(transport.Sent.Any(s => s.Contains("small_image") && s.Contains("mp:external/test/twitch.png")), "Session transmits the badge independently of the main image");
                 Check(session.Active, "Presence send changes local state");
                 await RejectAsync(() => session.SetPresence(false, "", ""), "Rapid presence change is limited");
                 await Until(() => transport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 1));
