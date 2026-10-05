@@ -13,9 +13,13 @@ namespace StreamSwitch {
         public static Color Mix(Color a,Color b,float t){return Color.FromArgb((int)(a.R+(b.R-a.R)*t),(int)(a.G+(b.G-a.G)*t),(int)(a.B+(b.B-a.B)*t));}
         public static void Mark(Graphics g,Rectangle r) {
             g.SmoothingMode=SmoothingMode.AntiAlias;
-            using(var p=Round(r,r.Width*.25f))using(var b=new LinearGradientBrush(r,Color.FromArgb(151,93,255),Color.FromArgb(58,201,228),45))g.FillPath(b,p);
-            using(var pen=new Pen(Color.FromArgb(110,255,255,255),r.Width*.045f))g.DrawArc(pen,r.X+r.Width*.15f,r.Y+r.Height*.15f,r.Width*.7f,r.Height*.7f,215,270);
-            using(var b=new SolidBrush(Color.White))g.FillPolygon(b,new[]{new PointF(r.X+r.Width*.41f,r.Y+r.Height*.29f),new PointF(r.X+r.Width*.72f,r.Y+r.Height*.5f),new PointF(r.X+r.Width*.41f,r.Y+r.Height*.71f)});
+            float cx=r.X+r.Width/2f,cy=r.Y+r.Height/2f,size=Math.Min(r.Width,r.Height);
+            var points=new PointF[40];
+            for(int i=0;i<40;i++){double angle=(i*.25-0.125)*Math.PI/5;float radius=size*((i%4==1||i%4==2)?.46f:.36f);points[i]=new PointF(cx+(float)Math.Cos(angle)*radius,cy+(float)Math.Sin(angle)*radius);}
+            using(var path=new GraphicsPath(FillMode.Alternate)){
+                path.AddPolygon(points);path.AddEllipse(cx-size*.16f,cy-size*.16f,size*.32f,size*.32f);
+                using(var brush=new SolidBrush(Color.FromArgb(191,195,218)))g.FillPath(brush,path);
+            }
         }
         public static void SaveIcon(string path) {
             using(var stream=File.Create(path))using(var w=new BinaryWriter(stream)){
@@ -74,16 +78,14 @@ namespace StreamSwitch {
         protected override void OnPaint(PaintEventArgs e){
             var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
             using(var path=StudioArt.Round(new RectangleF(0,0,Width-1,Height-1),20)){
-                g.SetClip(path);using(var brush=new LinearGradientBrush(ClientRectangle,Color.FromArgb(61,38,107),Color.FromArgb(20,62,84),30))g.FillPath(brush,path);
+                g.SetClip(path);using(var brush=new SolidBrush(Color.FromArgb(24,28,41)))g.FillPath(brush,path);
                 float cx=Width-88,cy=Height/2f;
-                for(int i=0;i<3;i++){float size=90+i*37+(float)Math.Sin(phase+i)*8;using(var pen=new Pen(Color.FromArgb(42,200,170,255),1))g.DrawEllipse(pen,cx-size/2,cy-size/2,size,size);}
-                for(int i=0;i<8;i++){double a=phase+i*Math.PI/4;using(var b=new SolidBrush(Color.FromArgb(90,183,215,255)))g.FillEllipse(b,cx+(float)Math.Cos(a)*78,cy+(float)Math.Sin(a)*65,3,3);}
-                StudioArt.Mark(g,new Rectangle((int)cx-31,(int)cy-31,62,62));
-                using(var f=new Font("Segoe UI",9,FontStyle.Bold))using(var b=new SolidBrush(Color.FromArgb(185,166,249)))g.DrawString("STREAMSWITCH / STUDIO",f,b,24,20);
-                using(var f=new Font("Segoe UI",23,FontStyle.Bold))using(var b=new SolidBrush(Color.White))g.DrawString("Hazlo tuyo.",f,b,22,46);
-                using(var f=new Font("Segoe UI",10))using(var b=new SolidBrush(Color.FromArgb(201,201,225)))g.DrawString("Tu imagen. Tu estilo. Tu presencia.",f,b,24,96);
+                var saved=g.Save();g.TranslateTransform(cx,cy);g.RotateTransform(phase*18);StudioArt.Mark(g,new Rectangle(-34,-34,68,68));g.Restore(saved);
+                using(var f=new Font("Segoe UI",9,FontStyle.Bold))using(var b=new SolidBrush(Color.FromArgb(172,180,202)))g.DrawString("STREAMSWITCH",f,b,24,20);
+                using(var f=new Font("Segoe UI",21,FontStyle.Bold))using(var b=new SolidBrush(Color.White))g.DrawString("Panel de presencia",f,b,22,46);
+                using(var f=new Font("Segoe UI",10))using(var b=new SolidBrush(Color.FromArgb(180,186,204)))g.DrawString("Estado, imagen y conexión con Discord.",f,b,24,96);
                 using(var b=new SolidBrush(Live?Color.FromArgb(101,231,188):Color.FromArgb(191,172,249)))g.FillEllipse(b,25,132,6,6);
-                using(var f=new Font("Segoe UI",8,FontStyle.Bold))using(var b=new SolidBrush(Color.FromArgb(201,201,225)))g.DrawString(Live?"PRESENCIA ENVIADA":"LISTO PARA CREAR",f,b,38,128);g.ResetClip();
+                using(var f=new Font("Segoe UI",8,FontStyle.Bold))using(var b=new SolidBrush(Color.FromArgb(201,201,225)))g.DrawString(Live?"PRESENCIA ENVIADA":"SIN PRESENCIA ENVIADA",f,b,38,128);g.ResetClip();
             }
         }
     }

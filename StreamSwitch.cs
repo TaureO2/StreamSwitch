@@ -300,7 +300,7 @@ namespace StreamSwitch {
         bool busy, closing;
         DateTime nextChange = DateTime.MinValue;
         public MainForm() {
-            Text = "StreamSwitch Studio";
+            Text = "StreamSwitch";
             ClientSize = new Size(1140, 900);
             MinimumSize = new Size(1100, 940);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -319,11 +319,14 @@ namespace StreamSwitch {
             var heading = new Panel { Dock = DockStyle.Fill };
             var mark = new BrandMark { Location = new Point(0,3), Size = new Size(52,52) }; heading.Controls.Add(mark);
             var brand = Label("StreamSwitch", 25, Color.White); brand.Dock = DockStyle.None; brand.Location = new Point(68, -2); brand.Size = new Size(450, 46);
-            var subtitle = Label("STUDIO   /   Diseña tu presencia", 10, Muted); subtitle.Dock = DockStyle.None; subtitle.Location = new Point(70, 47); subtitle.Size = new Size(500, 28);
+            var subtitle = Label("Herramienta de presencia para Discord", 10, Muted); subtitle.Dock = DockStyle.None; subtitle.Location = new Point(70, 47); subtitle.Size = new Size(500, 28);
             heading.Controls.Add(brand); heading.Controls.Add(subtitle); root.Controls.Add(heading, 0, 0);
             var credits = new LinkLabel { Text = "Icono Twitch · Icons8", AutoSize = true, Location = new Point(880, 51), LinkColor = Muted, ActiveLinkColor = Color.White };
             credits.LinkClicked += delegate { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://icons8.com/icons/set/twitch") { UseShellExecute = true }); };
             heading.Controls.Add(credits);
+            var sourceLink=new LinkLabel { Text="Código fuente",AutoSize=true,Location=new Point(730,15),LinkColor=Muted,ActiveLinkColor=Color.White };
+            sourceLink.LinkClicked+=delegate{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppDomain.CurrentDomain.BaseDirectory){UseShellExecute=true});};
+            heading.Controls.Add(sourceLink);
             motion.Location = new Point(880,14); heading.Controls.Add(motion);
             motion.CheckedChanged += delegate { hero.Motion = motion.Checked; AppButton.Motion = motion.Checked; SaveMotion(); };
             var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
