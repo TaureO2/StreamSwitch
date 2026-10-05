@@ -13,12 +13,19 @@ namespace StreamSwitch {
         Task<string> Resolve(string token, string applicationId, string imageUrl, CancellationToken ct);
     }
     internal sealed class ImageAssets : IImageAssets {
-        public const string TwitchIconUrl = "https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png";
+        public const string TwitchIconUrl = "https://img.icons8.com/color/96/twitch--v1.png";
+        public const string KickIconUrl = "https://about.kick.com/apple-icon.png?apple-icon.0ldhg5ovdrppx.png";
+        public static string LogoUrl(string choice) {
+            if (choice == "Twitch") return TwitchIconUrl;
+            if (choice == "Kick") return KickIconUrl;
+            if (choice == "Ninguno") return "";
+            throw new ArgumentException("Elige Twitch, Kick o Ninguno en el selector de logo.");
+        }
         readonly Dictionary<string, string> cache = new Dictionary<string, string>();
         public static string ApplicationId(string value) {
             value = (value ?? "").Trim();
             if (value.Length < 17 || value.Length > 20 || value.Any(c => c < '0' || c > '9'))
-                throw new ArgumentException("Para imágenes externas y el logo de Twitch, introduce el Application ID de una aplicación tuya de Discord.");
+                throw new ArgumentException("Para imágenes externas y logos, introduce el Application ID de una aplicación tuya de Discord.");
             return value;
         }
         public static string DirectAsset(string imageUrl) {

@@ -1,16 +1,16 @@
-﻿# StreamSwitch v4.0.0 — Single title and Twitch badge
+﻿# StreamSwitch v5.0.0 — Twitch and Kick logo selector
 
 Developed by **Oxigeno**.
 
 ## Changes
 
-- Sends the custom title once in activity details, with the platform as the activity name.
-- Removes redundant image text.
-- Adds an optional small Twitch badge over the main activity image.
+- Replaces the Twitch checkbox with Twitch, Kick, and None choices.
+- Adds local logo previews.
+- Uses a padded Twitch image for a better-centered badge and adds the Kick icon.
 
 ## Limitations
 
-Only the Twitch badge is available. Discord controls the final overlay size and position.
+Kick is a visual badge only; supported activity links remain Twitch and YouTube. Discord controls final badge placement.
 
 ## Download and run
 

@@ -48,7 +48,7 @@ namespace StreamSwitch {
                 throw new ArgumentException("La imagen necesita un enlace HTTPS público, no un archivo de tu PC.");
             return uri.AbsoluteUri;
         }
-        public static string Presence(bool active, string title, string url, string imageUrl = "", string applicationId = "", string smallImage = "") {
+        public static string Presence(bool active, string title, string url, string imageUrl = "", string applicationId = "", string smallImage = "", string badgeLabel = "Twitch") {
             object[] activities = new object[0];
             if (active) {
                 string streamUrl = StreamUrl(url);
@@ -60,9 +60,10 @@ namespace StreamSwitch {
                     var assets = new Dictionary<string, object> { { "large_image", imageUrl } };
                     if (!String.IsNullOrEmpty(smallImage)) {
                         if (!smallImage.StartsWith("mp:") || smallImage.Length > 2051 || smallImage.Any(Char.IsControl))
-                            throw new ArgumentException("El icono de Twitch aún no está preparado para Discord.");
+                            throw new ArgumentException("El logo aún no está preparado para Discord.");
                         assets["small_image"] = smallImage;
-                        assets["small_text"] = "Twitch";
+                        ImageAssets.LogoUrl(badgeLabel);
+                        assets["small_text"] = badgeLabel;
                     }
                     activity["assets"] = assets;
                     if (!String.IsNullOrWhiteSpace(applicationId)) activity["application_id"] = ImageAssets.ApplicationId(applicationId);
@@ -221,19 +222,20 @@ namespace StreamSwitch {
                 }
             } finally { sendLock.Release(); }
         }
-        public async Task SetPresence(bool value, string title, string url, string imageUrl = "", string applicationId = "", bool showTwitchBadge = true) {
+        public async Task SetPresence(bool value, string title, string url, string imageUrl = "", string applicationId = "", string logoChoice = "Twitch") {
             if (!Connected) throw new GatewayException("Conecta primero con Discord.");
             if ((DateTime.UtcNow - lastPresence).TotalSeconds < 6)
                 throw new GatewayException("Espera unos segundos antes del siguiente cambio.");
             string asset = "", badge = "";
             if (value) {
                 Protocol.Title(title); Protocol.StreamUrl(url);
+                string logoUrl = ImageAssets.LogoUrl(logoChoice);
                 if (!String.IsNullOrWhiteSpace(imageUrl)) {
                     asset = await imageAssets.Resolve(sessionToken, applicationId, imageUrl, lifetime.Token).ConfigureAwait(false);
-                    if (showTwitchBadge) badge = await imageAssets.Resolve(sessionToken, applicationId, ImageAssets.TwitchIconUrl, lifetime.Token).ConfigureAwait(false);
+                    if (logoUrl.Length > 0) badge = await imageAssets.Resolve(sessionToken, applicationId, logoUrl, lifetime.Token).ConfigureAwait(false);
                 }
             }
-            string payload = Protocol.Presence(value, title, url, asset, applicationId, badge);
+            string payload = Protocol.Presence(value, title, url, asset, applicationId, badge, logoChoice);
             try {
                 await Send(payload).ConfigureAwait(false);
                 active = value;
@@ -278,7 +280,8 @@ namespace StreamSwitch {
         readonly TextBox token = Input(true), title = Input(false), url = Input(false), imageUrl = Input(false), applicationId = Input(false);
         readonly PictureBox picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(35, 39, 54), Margin = new Padding(0, 4, 0, 8) };
         readonly Button loadImage = Button("Ver imagen", Color.FromArgb(49, 54, 72));
-        readonly CheckBox twitchBadge = new CheckBox { Text = "Icono pequeño de Twitch en la imagen", Checked = true, Dock = DockStyle.Fill, ForeColor = Color.White, AutoSize = true };
+        readonly ComboBox logoChoice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, BackColor = Color.White, ForeColor = Color.Black, AccessibleName = "Logo pequeño" };
+        readonly PictureBox logoPreview = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, Margin = new Padding(5, 0, 0, 0), AccessibleName = "Vista previa del logo" };
         readonly Label connection = Label("DESCONECTADO", 10, Muted);
         readonly Label account = Label("Tu cuenta de Discord", 17, Color.White);
         readonly Label previewTitle = Label("Mi directo", 14, Color.White);
@@ -294,7 +297,7 @@ namespace StreamSwitch {
         bool busy, closing;
         DateTime nextChange = DateTime.MinValue;
         public MainForm() {
-            Text = "StreamSwitch · Imagen v4";
+            Text = "StreamSwitch · Logos v5";
             ClientSize = new Size(1000, 860);
             MinimumSize = new Size(940, 890);
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -313,11 +316,14 @@ namespace StreamSwitch {
             var brand = Label("StreamSwitch", 27, Color.White); brand.Dock = DockStyle.None; brand.Location = new Point(0, 0); brand.Size = new Size(450, 46);
             var subtitle = Label("Tu presencia, a un clic.", 11, Muted); subtitle.Dock = DockStyle.None; subtitle.Location = new Point(2, 51); subtitle.Size = new Size(500, 28);
             heading.Controls.Add(brand); heading.Controls.Add(subtitle); root.Controls.Add(heading, 0, 0);
+            var credits = new LinkLabel { Text = "Twitch: icono de Icons8", AutoSize = true, Location = new Point(690, 55), LinkColor = Muted, ActiveLinkColor = Color.White };
+            credits.LinkClicked += delegate { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://icons8.com/icons/set/twitch") { UseShellExecute = true }); };
+            heading.Controls.Add(credits);
             var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             root.Controls.Add(columns, 0, 1);
             var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 17, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
-            int[] heights = { 30, 23, 34, 35, 32, 23, 34, 23, 34, 23, 36, 37, 23, 34, 28, 48 };
+            int[] heights = { 30, 23, 34, 35, 32, 23, 34, 23, 34, 23, 36, 37, 23, 34, 32, 48 };
             for (int i = 0; i < heights.Length; i++) form.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
             form.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             form.Controls.Add(Label("01   CONEXIÓN Y ESTADO", 10, Muted), 0, 0);
@@ -338,7 +344,19 @@ namespace StreamSwitch {
             form.Controls.Add(Label("Pega el enlace directo de una imagen pública.\nDéjalo vacío para usar el icono por defecto.", 9, Muted), 0, 11);
             form.Controls.Add(Label("Application ID para imágenes externas", 10, Color.White), 0, 12);
             form.Controls.Add(applicationId, 0, 13); applicationId.MaxLength = 20; applicationId.AccessibleName = "Application ID público de tu aplicación Discord";
-            form.Controls.Add(twitchBadge, 0, 14);
+            var logoRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
+            logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106)); logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
+            logoRow.Controls.Add(Label("Logo pequeño", 10, Color.White), 0, 0); logoRow.Controls.Add(logoChoice, 1, 0); logoRow.Controls.Add(logoPreview, 2, 0);
+            logoChoice.Items.AddRange(new object[] { "Twitch", "Kick", "Ninguno" }); logoChoice.SelectedIndex = 0;
+            logoChoice.DrawMode = DrawMode.OwnerDrawFixed;
+            logoChoice.DrawItem += delegate(object sender, DrawItemEventArgs e) {
+                e.DrawBackground();
+                if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, Convert.ToString(logoChoice.Items[e.Index]), logoChoice.Font, e.Bounds,
+                    (e.State & DrawItemState.Selected) != 0 ? SystemColors.HighlightText : Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                e.DrawFocusRectangle();
+            };
+            logoChoice.SelectedIndexChanged += delegate { UpdateLogoPreview(); };
+            form.Controls.Add(logoRow, 0, 14);
             var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 12, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
             actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 15);
@@ -370,7 +388,14 @@ namespace StreamSwitch {
             deactivate.Click += async delegate { await ChangePresence(false); };
             timer.Tick += delegate { UpdateButtons(); }; timer.Start();
             FormClosing += OnClosing;
-            LoadPreferences(); UpdateButtons();
+            LoadPreferences(); UpdateLogoPreview(); UpdateButtons();
+        }
+        void UpdateLogoPreview() {
+            var old = logoPreview.Image; logoPreview.Image = null; if (old != null) old.Dispose();
+            string selected = Convert.ToString(logoChoice.SelectedItem);
+            if (selected == "Ninguno") return;
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logos", selected.ToLowerInvariant() + ".png");
+            try { using (var source = Image.FromFile(path)) logoPreview.Image = new Bitmap(source); } catch { }
         }
         static Label Label(string text, float size, Color color) {
             return new Label { Text = text, Dock = DockStyle.Fill, Font = new Font("Segoe UI", size), ForeColor = color, AutoEllipsis = true, Margin = Padding.Empty };
@@ -467,7 +492,7 @@ namespace StreamSwitch {
             try {
                 if (session == null) throw new GatewayException("Conecta primero con Discord.");
                 ShowStatus(active && imageUrl.Text.Trim().Length > 0 ? "Preparando la imagen en Discord…" : "Enviando el estado…", false);
-                await session.SetPresence(active, title.Text, url.Text, imageUrl.Text, applicationId.Text, twitchBadge.Checked);
+                await session.SetPresence(active, title.Text, url.Text, imageUrl.Text, applicationId.Text, Convert.ToString(logoChoice.SelectedItem));
                 nextChange = DateTime.UtcNow.AddSeconds(6);
                 activityState.Text = active ? "SOLICITUD ENVIADA · SIN VERIFICAR" : "RETIRADA SOLICITADA";
                 ShowStatus(active ? "Estado enviado. Comprueba el icono desde otra cuenta; Discord no confirma su visualización." : "Retirada enviada. Tu sesión queda en línea.", false);
@@ -483,11 +508,12 @@ namespace StreamSwitch {
                 url.Text = Protocol.StreamUrl(Convert.ToString(saved["url"]));
                 if (saved.ContainsKey("imageUrl")) imageUrl.Text = Protocol.ImageUrl(Convert.ToString(saved["imageUrl"]));
                 if (saved.ContainsKey("applicationId")) applicationId.Text = Convert.ToString(saved["applicationId"]);
-                if (saved.ContainsKey("showTwitchBadge")) twitchBadge.Checked = Convert.ToBoolean(saved["showTwitchBadge"]);
+                if (saved.ContainsKey("logoChoice") && logoChoice.Items.Contains(Convert.ToString(saved["logoChoice"]))) logoChoice.SelectedItem = Convert.ToString(saved["logoChoice"]);
+                else if (saved.ContainsKey("showTwitchBadge")) logoChoice.SelectedItem = Convert.ToBoolean(saved["showTwitchBadge"]) ? "Twitch" : "Ninguno";
             } catch { }
         }
         void SavePreferences() {
-            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim(), imageUrl = imageUrl.Text.Trim(), applicationId = applicationId.Text.Trim(), showTwitchBadge = twitchBadge.Checked }), Encoding.UTF8); }
+            try { File.WriteAllText(settingsPath, Protocol.Json(new { title = title.Text.Trim(), url = url.Text.Trim(), imageUrl = imageUrl.Text.Trim(), applicationId = applicationId.Text.Trim(), logoChoice = Convert.ToString(logoChoice.SelectedItem) }), Encoding.UTF8); }
             catch { ShowStatus(status.Text + " No se han podido guardar el título y el enlace.", false); }
         }
         async void OnClosing(object sender, FormClosingEventArgs e) {

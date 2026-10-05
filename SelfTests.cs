@@ -16,7 +16,7 @@ namespace StreamSwitch {
             LastUrl = Protocol.ImageUrl(imageUrl); LastApplication = applicationId;
             Urls.Add(imageUrl);
             if (Fail) throw new GatewayException("Simulated asset failure");
-            return Task.FromResult(imageUrl == ImageAssets.TwitchIconUrl ? "mp:external/test/twitch.png" : "mp:external/test/https/example.com/photo.png");
+            return Task.FromResult(imageUrl == ImageAssets.TwitchIconUrl ? "mp:external/test/twitch.png" : imageUrl == ImageAssets.KickIconUrl ? "mp:external/test/kick.png" : "mp:external/test/https/example.com/photo.png");
         }
     }
     internal sealed class FakeTransport : ITransport {
@@ -100,6 +100,11 @@ namespace StreamSwitch {
             Check(Convert.ToString(Protocol.Map(badgeActivity["assets"])["small_text"]) == "Twitch", "Badge label identifies Twitch");
             Check(Protocol.Json(badgePayload).Split(new[] { "Mi directo" }, StringSplitOptions.None).Length == 2, "Custom title occurs only once in activity payload");
             Check(!Protocol.Map(activityWithImage["assets"]).ContainsKey("small_image"), "Badge may be omitted independently");
+            Check(ImageAssets.LogoUrl("Kick") == ImageAssets.KickIconUrl, "Kick selector uses official Kick icon");
+            Check(ImageAssets.LogoUrl("Ninguno") == "", "No-logo option has no asset URL");
+            Reject(() => ImageAssets.LogoUrl("Other"), "Unknown logo rejected");
+            var kickJson = Protocol.Presence(true, "Mi directo", "https://twitch.tv/example", "mp:external/main", "123456789012345678", "mp:external/kick", "Kick");
+            Check(kickJson.Contains("\"small_text\":\"Kick\""), "Kick asset is labelled Kick");
             foreach (var badImage in new[] { "C:\\photo.png", "file:///C:/photo.png", "http://example.com/photo.png", "https://user:secret@example.com/photo.png", "https://localhost/photo.png", "https://127.0.0.1/photo.png" })
                 Reject(() => Protocol.ImageUrl(badImage), "Non-public or insecure image rejected: " + badImage);
             Check(!Protocol.Presence(false, "", "", "invalid").Contains("assets"), "Clearing ignores image and removes activity");
@@ -112,7 +117,7 @@ namespace StreamSwitch {
                 await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png", "123456789012345678");
                 Check(transport.Sent.Any(s => s.Contains("large_image") && s.Contains("mp:external/test/https/example.com/photo.png")), "Session sends converted image instead of raw URL");
                 Check(assetResolver.LastApplication == "123456789012345678" && assetResolver.Urls.Contains("https://example.com/photo.png"), "Session resolves the selected image with the selected application");
-                Check(assetResolver.Urls.Contains(ImageAssets.TwitchIconUrl), "Session resolves the official Twitch icon");
+                Check(assetResolver.Urls.Contains(ImageAssets.TwitchIconUrl), "Session resolves the padded Twitch icon");
                 Check(transport.Sent.Any(s => s.Contains("small_image") && s.Contains("mp:external/test/twitch.png")), "Session transmits the badge independently of the main image");
                 Check(session.Active, "Presence send changes local state");
                 await RejectAsync(() => session.SetPresence(false, "", ""), "Rapid presence change is limited");
@@ -144,6 +149,16 @@ namespace StreamSwitch {
                 Check(!failedAssetTransport.Sent.Any(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3), "Failed conversion does not silently send broken image");
             }
             var reconnectTransport = new FakeTransport();
+            foreach (string choice in new[] { "Kick", "Ninguno" }) {
+                var logoTransport = new FakeTransport(); var logoAssets = new FakeImageAssets();
+                using (var session = new Session(logoTransport, logoAssets)) {
+                    await session.Start("FAKE_TEST_CREDENTIAL");
+                    await session.SetPresence(true, "Mi directo", "https://twitch.tv/example", "https://example.com/photo.png", "123456789012345678", choice);
+                    var sent = logoTransport.Sent.Last(s => Convert.ToInt32(Protocol.Read(s)["op"]) == 3);
+                    Check(choice == "Kick" ? sent.Contains("mp:external/test/kick.png") && !logoAssets.Urls.Contains(ImageAssets.TwitchIconUrl) : !sent.Contains("small_image") && logoAssets.Urls.Count == 1, "Selected logo only: " + choice);
+                    Check(sent.Contains("mp:external/test/https/example.com/photo.png"), "Main image preserved with logo: " + choice);
+                }
+            }
             using (var session = new Session(reconnectTransport)) {
                 await session.Start("FAKE_TEST_CREDENTIAL"); reconnectTransport.Enqueue("{\"op\":7,\"d\":null}");
                 await Until(() => !session.Connected); Check(!session.Connected, "Reconnect request stops instead of looping");
