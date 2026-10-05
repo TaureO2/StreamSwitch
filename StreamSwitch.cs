@@ -22,11 +22,11 @@ namespace StreamSwitch {
             Uri uri;
             if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out uri) || uri.Scheme != "https" ||
                 !String.IsNullOrEmpty(uri.UserInfo) || !uri.IsDefaultPort || value.Length > 512)
-                throw new ArgumentException("Use an HTTPS link from Twitch or YouTube.");
+                throw new ArgumentException("Use an HTTPS link from Twitch, YouTube or Kick.");
             var host = uri.DnsSafeHost.ToLowerInvariant();
-            var allowed = new[] { "twitch.tv", "www.twitch.tv", "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be" };
+            var allowed = new[] { "twitch.tv", "www.twitch.tv", "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "kick.com", "www.kick.com" };
             if (!allowed.Contains(host) || uri.AbsolutePath.Trim('/').Length == 0)
-                throw new ArgumentException("Enter the full link to a Twitch or YouTube channel or video.");
+                throw new ArgumentException("Enter the full link to a Twitch, YouTube or Kick channel or video.");
             return uri.AbsoluteUri;
         }
         public static string Title(string value) {
@@ -52,7 +52,8 @@ namespace StreamSwitch {
             object[] activities = new object[0];
             if (active) {
                 string streamUrl = StreamUrl(url);
-                string platform = new Uri(streamUrl).Host.EndsWith("twitch.tv") ? "Twitch" : "YouTube";
+                string host = new Uri(streamUrl).Host;
+                string platform = host == "kick.com" || host == "www.kick.com" ? "Kick" : host.EndsWith("twitch.tv") ? "Twitch" : "YouTube";
                 var activity = new Dictionary<string, object> { { "name", platform }, { "details", Title(title) }, { "type", 1 }, { "url", streamUrl } };
                 if (!String.IsNullOrEmpty(imageUrl)) {
                     if (!imageUrl.StartsWith("mp:") || imageUrl.Length > 2051 || imageUrl.Any(Char.IsControl))
@@ -285,7 +286,7 @@ namespace StreamSwitch {
         readonly Label connection = Label("DISCONNECTED", 10, Muted);
         readonly Label account = Label("Your Discord account", 17, Color.White);
         readonly Label previewTitle = Label("My stream", 14, Color.White);
-        readonly Label previewUrl = Label("twitch.tv / youtube.com", 10, Muted);
+        readonly Label previewUrl = Label("twitch.tv / youtube.com / kick.com", 10, Muted);
         readonly Label status = Label("Connect your account to get started.", 10, Muted);
         readonly Label activityState = Label("PREVIEW · NOT PUBLISHED", 9, Muted);
         readonly Button connect = Button("Connect", Purple);
@@ -335,7 +336,7 @@ namespace StreamSwitch {
             form.Controls.Add(connect, 0, 4);
             form.Controls.Add(Label("Stream title", 10, Color.White), 0, 5);
             form.Controls.Add(new StudioField(title), 0, 6); title.AccessibleName = "Stream title"; title.MaxLength = 128; title.Text = "My stream";
-            form.Controls.Add(Label("Twitch or YouTube link", 10, Color.White), 0, 7);
+            form.Controls.Add(Label("Stream link (Kick is experimental)", 10, Color.White), 0, 7);
             form.Controls.Add(new StudioField(url), 0, 8); url.AccessibleName = "Stream link"; url.MaxLength = 512;
             form.Controls.Add(Label("Activity image (optional)", 10, Color.White), 0, 9);
             var imageRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
@@ -391,7 +392,7 @@ namespace StreamSwitch {
             notice.Margin = new Padding(0, 18, 0, 0); root.Controls.Add(notice, 0, 2);
             status.Padding = new Padding(0, 8, 0, 0); root.Controls.Add(status, 0, 3);
             title.TextChanged += delegate { previewTitle.Text = title.Text.Trim().Length == 0 ? "My stream" : title.Text; };
-            url.TextChanged += delegate { previewUrl.Text = url.Text.Trim().Length == 0 ? "twitch.tv / youtube.com" : url.Text; };
+            url.TextChanged += delegate { previewUrl.Text = url.Text.Trim().Length == 0 ? "twitch.tv / youtube.com / kick.com" : url.Text; };
             imageUrl.TextChanged += delegate { var old = picture.Image; picture.Image = null; if (old != null) old.Dispose(); };
             loadImage.Click += async delegate { await LoadImage(); };
             connect.Click += async delegate { await ConnectClicked(); };
@@ -511,7 +512,7 @@ namespace StreamSwitch {
                 await session.SetPresence(active, title.Text, url.Text, imageUrl.Text, applicationId.Text, Convert.ToString(logoChoice.SelectedItem));
                 nextChange = DateTime.UtcNow.AddSeconds(6);
                 activityState.Text = active ? "REQUEST SENT · NOT VERIFIED" : "REMOVAL REQUESTED";
-                ShowStatus(active ? "Status sent. Check from another account; Discord does not confirm how it appears." : "Removal request sent. Your session remains online.", false);
+                ShowStatus(active ? (new Uri(url.Text.Trim()).Host.EndsWith("kick.com") ? "Kick request sent. Discord only documents Twitch/YouTube streaming; the purple status may not appear." : "Status sent. Check from another account; Discord does not confirm how it appears.") : "Removal request sent. Your session remains online.", false);
                 SavePreferences();
             } catch (Exception ex) { ShowStatus(ex is ArgumentException || ex is GatewayException ? ex.Message : "Could not change the status.", true); }
             finally { busy = false; UpdateButtons(); }

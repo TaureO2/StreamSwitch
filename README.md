@@ -2,7 +2,7 @@
 
 **A Windows desktop tool for managing Discord streaming presence. Developed by Oxigeno.**
 
-StreamSwitch lets you configure a streaming title, a Twitch or YouTube link, an optional image, and a small Twitch or Kick logo. It includes a local preview, a gear icon, and animated controls. The interface and messages are in English.
+StreamSwitch lets you configure a streaming title, a Twitch, YouTube, or experimental Kick link, an optional image, and a small Twitch or Kick logo. It includes a local preview, a gear icon, and animated controls. The interface and messages are in English.
 
 ![StreamSwitch interface](docs/screenshot.png)
 
@@ -43,10 +43,10 @@ For PowerShell users, `build.ps1` provides the same build when local script poli
 1. Close any other running version of StreamSwitch.
 2. Enter your own account token in the app's **Account token** field, then select **Connect**. Never paste tokens in issues, screenshots, chat, or source files.
 3. Enter a **Stream title** between 2 and 128 characters.
-4. Enter a full HTTPS **Twitch or YouTube link**, including the channel or video path. A link does not start a real stream.
+4. Enter a full HTTPS **Twitch, YouTube, or Kick link**, including the channel or video path. Kick is experimental: Discord only documents Twitch and YouTube for streaming presence, so a Kick URL may not display the purple status. A link does not start a real stream.
 5. Optionally paste a direct public HTTPS URL into **Activity image** and select **View image**.
 6. If using an external image, enter your application's public **Application ID**.
-7. Choose a **Small logo**: Twitch, Kick, or None. The small logo requires a main image. Kick changes the badge only; Kick streaming links are not supported.
+7. Choose a **Small logo**: Twitch, Kick, or None. The small logo requires a main image. The badge and stream URL are independent. Kick URLs are accepted experimentally; selecting a Kick badge does not enable native Kick support in Discord.
 8. Select **Enable streaming**. Check the result from another Discord account if needed.
 
 **Remove status** sends a request to clear the activity while keeping the session online. **Disconnect**, or closing the window, attempts to remove the activity and close the connection. Discord may take time to update. Changes have a short cooldown to avoid rapid repeated requests.
@@ -125,3 +125,7 @@ Original source code is available under the [MIT License](LICENSE), copyright (c
 ## Previous versions
 
 See the [version archive](CHANGELOG.md) for seven historical editions and their changes. Download their executable-and-source packages from [Releases](https://github.com/TaureO2/StreamSwitch/releases). Historical interfaces are in Spanish; this main branch contains the newer English edition.
+
+### Kick compatibility
+
+Kick channel links such as `https://kick.com/example` are accepted and sent unchanged, with Kick as the activity name. This is experimental: [Discord documents streaming URLs only for Twitch and YouTube](https://github.com/discord/discord-api-docs/blob/main/developers/events/gateway-events.mdx). StreamSwitch cannot enable server-side Kick support or guarantee the purple indicator. The app shows this limitation after sending a Kick request.

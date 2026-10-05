@@ -1,5 +1,13 @@
 ﻿# Version archive
 
+## Current English edition — experimental Kick URLs
+
+- Accept HTTPS channel links on kick.com and www.kick.com, with the original URL preserved.
+- Identify Kick activities correctly instead of labeling them YouTube.
+- Explain that Discord only documents Twitch/YouTube streaming and may not display a purple status for Kick.
+- Test accepted URLs, missing channel paths, insecure links, and lookalike domains.
+
+
 ## Current English edition — resize fix
 
 - Repaint custom cards, fields, logo choices, buttons, and artwork completely when resized.

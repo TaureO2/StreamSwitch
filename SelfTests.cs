@@ -111,6 +111,13 @@ namespace StreamSwitch {
             Check(Protocol.StreamUrl("https://www.youtube.com/watch?v=abc").Contains("watch"), "YouTube URL accepted");
             foreach (var bad in new[] { "http://twitch.tv/name", "https://twitch.tv.evil.test/name", "https://twitch.tv@evil.test/name", "file:///tmp/a", "https://twitch.tv", "https://twitch.tv:8443/name", "https://person@twitch.tv/name" })
                 Reject(() => Protocol.StreamUrl(bad), "Unsafe or invalid URL rejected: " + bad);
+            foreach (string kickUrl in new[] { "https://kick.com/example", "https://www.kick.com/example" }) {
+                Check(Protocol.StreamUrl(kickUrl) == kickUrl, "Kick URL accepted: " + kickUrl);
+                var kickPresence = Protocol.Presence(true, "My stream", kickUrl);
+                Check(kickPresence.Contains("\"name\":\"Kick\"") && kickPresence.Contains(kickUrl), "Kick URL and platform preserved in presence");
+            }
+            foreach (string badKick in new[] { "https://kick.com", "https://kick.com/", "http://kick.com/example", "https://kick.com.evil.test/example", "https://kick.com@evil.test/example", "https://evil.test@kick.com/example", "https://kick.com:8443/example" })
+                Reject(() => Protocol.StreamUrl(badKick), "Invalid Kick URL rejected: " + badKick);
             Reject(() => Protocol.Title("a"), "Short title rejected");
             Reject(() => Protocol.Title(new string('x', 129)), "Long title rejected");
             Reject(() => Protocol.Title("bad\ntitle"), "Control characters rejected");
