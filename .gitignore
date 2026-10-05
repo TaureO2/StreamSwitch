@@ -1,0 +1,12 @@
+*.exe
+*.pdb
+*.zip
+preferencias.json
+studio-settings.json
+self-test.txt
+ui-test.txt
+tests.txt
+.vs/
+bin/
+obj/
+*.user

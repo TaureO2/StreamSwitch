@@ -1,0 +1,6 @@
+$ErrorActionPreference = 'Stop'
+$compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+$appRoot = $PSScriptRoot
+& $compiler /nologo /target:winexe /optimize+ /codepage:65001 /out:"$appRoot\StreamSwitch.exe" /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll "$appRoot\StreamSwitch.cs" "$appRoot\SelfTests.cs" "$appRoot\AppButton.cs"
+if ($LASTEXITCODE -ne 0) { throw 'La compilación ha fallado.' }
+Write-Output 'StreamSwitch.exe creado.'
