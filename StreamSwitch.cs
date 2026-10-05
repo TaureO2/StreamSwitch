@@ -551,7 +551,7 @@ namespace StreamSwitch {
             if(args.Contains("--ui-test"))return SelfTests.RunUI(args[1]);
             if (args.Contains("--preview")) {
                 using (var preview = new MainForm()) {
-                    preview.Show(); Application.DoEvents();
+                    preview.Show(); if(args.Contains("--maximized")) preview.WindowState=FormWindowState.Maximized; Application.DoEvents();
                     using (var bitmap = new Bitmap(preview.Width, preview.Height)) { preview.DrawToBitmap(bitmap, new Rectangle(0, 0, preview.Width, preview.Height)); bitmap.Save(args[1]); }
                 }
                 return 0;

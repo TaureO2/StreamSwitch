@@ -70,6 +70,21 @@ namespace StreamSwitch {
                 }
                 using(var icon=System.Drawing.Icon.ExtractAssociatedIcon(System.Windows.Forms.Application.ExecutablePath)) Check(icon!=null,"Executable contains an application icon");
                 using(var form=new MainForm()){form.Show();System.Windows.Forms.Application.DoEvents();Check(form.ClientSize.Width>=1100,"Studio window lays out at the intended size");}
+                foreach(var control in new System.Windows.Forms.Control[] { new StudioCard(), new StudioField(new System.Windows.Forms.TextBox()), new StudioLogoPicker(), new StudioHero { Motion=false }, new BrandMark(), new AppButton() }) {
+                    using(control)
+                    using(var host=new System.Windows.Forms.Form { ClientSize=new System.Drawing.Size(850,300) }) {
+                        control.Dock=System.Windows.Forms.DockStyle.None;
+                        control.Bounds=new System.Drawing.Rectangle(10,10,300,160);
+                        host.Controls.Add(control);host.Show();System.Windows.Forms.Application.DoEvents();
+                        bool full=false;
+                        control.Invalidated+=delegate(object sender,System.Windows.Forms.InvalidateEventArgs e) { if(e.InvalidRect.Contains(control.ClientRectangle))full=true; };
+                        foreach(int width in new[]{700,340,760,300}) {
+                            full=false;control.Size=new System.Drawing.Size(width,180);
+                            Check(full,control.GetType().Name+" invalidates its full surface on resize to "+width);
+                            control.Update();System.Windows.Forms.Application.DoEvents();
+                        }
+                    }
+                }
                 report.Add("UI smoke checks passed; no credentials or Discord connection used.");File.WriteAllLines(path,report);return 0;
             }catch(Exception ex){report.Add("FAIL "+ex.Message);File.WriteAllLines(path,report);return 1;}
         }

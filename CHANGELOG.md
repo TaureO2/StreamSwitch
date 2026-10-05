@@ -1,5 +1,12 @@
 ﻿# Version archive
 
+## Current English edition — resize fix
+
+- Repaint custom cards, fields, logo choices, buttons, and artwork completely when resized.
+- Fix stale borders and duplicated logo labels after maximizing or restoring the window.
+- Add regression checks for repeated growth and shrinkage of all custom controls.
+
+
 Developed by **Oxigeno**.
 
 These seven historical editions were archived from preserved local source snapshots. Each release includes matching source code, a rebuilt Windows executable, individual change notes, known limitations, and a SHA-256 checksum. Tags were assigned retrospectively; release publication dates describe the archive publication, not original release dates.

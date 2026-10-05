@@ -9,7 +9,7 @@ namespace StreamSwitch {
         float hover; bool over, pressed;
         public static bool Motion = true;
         public AppButton() {
-            DoubleBuffered = true;
+            DoubleBuffered = true; ResizeRedraw = true;
             MouseEnter += delegate { over = true; animation.Start(); };
             MouseLeave += delegate { over = false; pressed = false; animation.Start(); };
             MouseDown += delegate { pressed = true; Invalidate(); };

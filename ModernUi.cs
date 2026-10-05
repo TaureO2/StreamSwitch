@@ -35,14 +35,14 @@ namespace StreamSwitch {
         }
     }
     internal sealed class BrandMark:Control {
-        public BrandMark(){DoubleBuffered=true;}
+        public BrandMark(){DoubleBuffered=true;ResizeRedraw=true;}
         protected override void OnPaint(PaintEventArgs e){StudioArt.Mark(e.Graphics,new Rectangle(0,0,Width-1,Height-1));}
     }
     internal sealed class StudioLogoPicker:Control {
         public string Selected="Twitch";
         public event EventHandler SelectionChanged;
         readonly string[] choices={"Twitch","Kick","None"};
-        public StudioLogoPicker(){DoubleBuffered=true;Dock=DockStyle.Fill;TabStop=true;Cursor=Cursors.Hand;AccessibleName="Small logo: Twitch, Kick or None";}
+        public StudioLogoPicker(){DoubleBuffered=true;ResizeRedraw=true;Dock=DockStyle.Fill;TabStop=true;Cursor=Cursors.Hand;AccessibleName="Small logo: Twitch, Kick or None";}
         void SelectIndex(int i){Selected=choices[Math.Max(0,Math.Min(2,i))];Invalidate();if(SelectionChanged!=null)SelectionChanged(this,EventArgs.Empty);}
         protected override void OnMouseDown(MouseEventArgs e){Focus();SelectIndex(e.X*3/Math.Max(1,Width));base.OnMouseDown(e);}
         protected override bool IsInputKey(Keys key){return key==Keys.Left||key==Keys.Right||base.IsInputKey(key);}
@@ -57,7 +57,7 @@ namespace StreamSwitch {
     }
     internal class StudioCard:Panel {
         public Color Surface=Color.FromArgb(22,25,38);
-        public StudioCard(){DoubleBuffered=true;BackColor=Color.FromArgb(12,14,23);}
+        public StudioCard(){DoubleBuffered=true;ResizeRedraw=true;BackColor=Color.FromArgb(12,14,23);}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
             using(var p=StudioArt.Round(new RectangleF(1,1,Width-3,Height-3),18)){
                 using(var b=new SolidBrush(Surface))e.Graphics.FillPath(b,p);using(var pen=new Pen(Color.FromArgb(46,49,68)))e.Graphics.DrawPath(pen,p);
@@ -66,14 +66,14 @@ namespace StreamSwitch {
     }
     internal sealed class StudioField:Panel {
         readonly TextBox input;
-        public StudioField(TextBox text){input=text;Dock=DockStyle.Fill;Margin=new Padding(0,0,0,7);Padding=new Padding(12,8,12,6);BackColor=Color.FromArgb(29,33,49);DoubleBuffered=true;
+        public StudioField(TextBox text){input=text;Dock=DockStyle.Fill;Margin=new Padding(0,0,0,7);Padding=new Padding(12,8,12,6);BackColor=Color.FromArgb(29,33,49);DoubleBuffered=true;ResizeRedraw=true;
             input.BorderStyle=BorderStyle.None;input.BackColor=BackColor;input.Margin=Padding.Empty;input.Dock=DockStyle.Fill;Controls.Add(input);input.Enter+=delegate{Invalidate();};input.Leave+=delegate{Invalidate();};}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
             using(var p=StudioArt.Round(new RectangleF(.5f,.5f,Width-2,Height-2),8))using(var pen=new Pen(input.Focused?Color.FromArgb(167,128,255):Color.FromArgb(50,56,77),input.Focused?2:1))e.Graphics.DrawPath(pen,p);}
     }
     internal sealed class StudioHero:Control {
         readonly Timer animation=new Timer{Interval=33};float phase;public bool Motion=true;public bool Live;
-        public StudioHero(){DoubleBuffered=true;Dock=DockStyle.Fill;BackColor=Color.FromArgb(12,14,23);animation.Tick+=delegate{if(Motion&&Visible&&FindForm()!=null&&FindForm().WindowState!=FormWindowState.Minimized){phase+=.012f;Invalidate();}};animation.Start();}
+        public StudioHero(){DoubleBuffered=true;ResizeRedraw=true;Dock=DockStyle.Fill;BackColor=Color.FromArgb(12,14,23);animation.Tick+=delegate{if(Motion&&Visible&&FindForm()!=null&&FindForm().WindowState!=FormWindowState.Minimized){phase+=.012f;Invalidate();}};animation.Start();}
         protected override void Dispose(bool disposing){if(disposing)animation.Dispose();base.Dispose(disposing);}
         protected override void OnPaint(PaintEventArgs e){
             var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
