@@ -1,0 +1,30 @@
+name: Windows build and tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        shell: cmd
+        run: build.cmd
+      - name: Run simulated tests
+        shell: pwsh
+        run: |
+          $process = Start-Process .\StreamSwitch.exe -ArgumentList '--self-test','self-test.txt' -Wait -PassThru
+          Get-Content .\self-test.txt
+          if ($process.ExitCode -ne 0) { throw 'Simulated tests failed' }
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: StreamSwitch-Windows-English
+          path: |
+            StreamSwitch.exe
+            logos/
+            README.md
+            THIRD_PARTY_NOTICES.md
+            LICENSE
