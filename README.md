@@ -1,20 +1,20 @@
-﻿# StreamSwitch v5.0.0 — Twitch and Kick logo selector
+﻿# StreamSwitch v6.0.0 — Studio interface and animations
 
 Developed by **Oxigeno**.
 
 ## Changes
 
-- Replaces the Twitch checkbox with Twitch, Kick, and None choices.
-- Adds local logo previews.
-- Uses a padded Twitch image for a better-centered badge and adds the Kick icon.
+- Introduces the Studio interface with rounded cards, animated buttons, focus highlights, and a window fade-in.
+- Adds an embedded application icon, animated header, and segmented logo selector.
+- Adds an animation toggle and pauses continuous animation when minimized.
 
 ## Limitations
 
-Kick is a visual badge only; supported activity links remain Twitch and YouTube. Discord controls final badge placement.
+Historical Spanish Studio design, including its original promotional copy and play-style branding. Replaced by the gear design in v7.
 
 ## Download and run
 
-Download the attached Windows ZIP, extract it, and open `StreamSwitch.exe`. Close other StreamSwitch versions first. The original interface is in Spanish. Source code is included; run `Compilar.cmd` to rebuild with the Windows .NET Framework compiler. Keep the `logos` folder alongside the executable if included.
+Download the attached Windows ZIP, extract it, and open `StreamSwitch.Studio.exe`. Close other StreamSwitch versions first. The original interface is in Spanish. Source code is included; run `Compilar.cmd` to rebuild with the Windows .NET Framework compiler. Keep the `logos` folder alongside the executable if included.
 
 Enter your own token only in the application. Never publish tokens or preference files. Personal-account automation is unofficial and violates Discord rules; Discord may reject requests or suspend accounts. These releases do not start a broadcast or guarantee a purple status icon.
 

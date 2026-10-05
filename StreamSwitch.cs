@@ -273,8 +273,8 @@ namespace StreamSwitch {
     }
 
     internal sealed class MainForm : Form {
-        static readonly Color Bg = Color.FromArgb(15, 17, 25);
-        static readonly Color Card = Color.FromArgb(24, 27, 39);
+        static readonly Color Bg = Color.FromArgb(12, 14, 23);
+        static readonly Color Card = Color.FromArgb(22, 25, 38);
         static readonly Color Muted = Color.FromArgb(169, 177, 197);
         static readonly Color Purple = Color.FromArgb(141, 94, 255);
         readonly TextBox token = Input(true), title = Input(false), url = Input(false), imageUrl = Input(false), applicationId = Input(false);
@@ -292,20 +292,24 @@ namespace StreamSwitch {
         readonly Button activate = Button("Activar streaming", Purple);
         readonly Button deactivate = Button("Quitar estado", Color.FromArgb(49, 54, 72));
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 200 };
+        readonly StudioHero hero = new StudioHero();
+        readonly StudioLogoPicker logoPicker = new StudioLogoPicker();
+        readonly CheckBox motion = new CheckBox { Text = "Animaciones", Checked = true, AutoSize = true, ForeColor = Color.FromArgb(177,184,207), BackColor = Color.FromArgb(12,14,23) };
         readonly string settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "preferencias.json");
         Session session;
         bool busy, closing;
         DateTime nextChange = DateTime.MinValue;
         public MainForm() {
-            Text = "StreamSwitch · Logos v5";
-            ClientSize = new Size(1000, 860);
-            MinimumSize = new Size(940, 890);
+            Text = "StreamSwitch Studio";
+            ClientSize = new Size(1140, 900);
+            MinimumSize = new Size(1100, 940);
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Bg;
             ForeColor = Color.White;
             Font = new Font("Segoe UI", 10);
-            Icon = SystemIcons.Application;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            DoubleBuffered = true;
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(32), ColumnCount = 1, RowCount = 4 };
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -313,69 +317,81 @@ namespace StreamSwitch {
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             Controls.Add(root);
             var heading = new Panel { Dock = DockStyle.Fill };
-            var brand = Label("StreamSwitch", 27, Color.White); brand.Dock = DockStyle.None; brand.Location = new Point(0, 0); brand.Size = new Size(450, 46);
-            var subtitle = Label("Tu presencia, a un clic.", 11, Muted); subtitle.Dock = DockStyle.None; subtitle.Location = new Point(2, 51); subtitle.Size = new Size(500, 28);
+            var mark = new BrandMark { Location = new Point(0,3), Size = new Size(52,52) }; heading.Controls.Add(mark);
+            var brand = Label("StreamSwitch", 25, Color.White); brand.Dock = DockStyle.None; brand.Location = new Point(68, -2); brand.Size = new Size(450, 46);
+            var subtitle = Label("STUDIO   /   Diseña tu presencia", 10, Muted); subtitle.Dock = DockStyle.None; subtitle.Location = new Point(70, 47); subtitle.Size = new Size(500, 28);
             heading.Controls.Add(brand); heading.Controls.Add(subtitle); root.Controls.Add(heading, 0, 0);
-            var credits = new LinkLabel { Text = "Twitch: icono de Icons8", AutoSize = true, Location = new Point(690, 55), LinkColor = Muted, ActiveLinkColor = Color.White };
+            var credits = new LinkLabel { Text = "Icono Twitch · Icons8", AutoSize = true, Location = new Point(880, 51), LinkColor = Muted, ActiveLinkColor = Color.White };
             credits.LinkClicked += delegate { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://icons8.com/icons/set/twitch") { UseShellExecute = true }); };
             heading.Controls.Add(credits);
+            motion.Location = new Point(880,14); heading.Controls.Add(motion);
+            motion.CheckedChanged += delegate { hero.Motion = motion.Checked; AppButton.Motion = motion.Checked; SaveMotion(); };
             var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52)); columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48));
             root.Controls.Add(columns, 0, 1);
-            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 17, BackColor = Card, Padding = new Padding(22), Margin = new Padding(0, 0, 12, 0) };
-            int[] heights = { 30, 23, 34, 35, 32, 23, 34, 23, 34, 23, 36, 37, 23, 34, 32, 48 };
+            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 17, BackColor = Card, Padding = new Padding(0), Margin = Padding.Empty };
+            int[] heights = { 37, 23, 42, 35, 42, 23, 42, 23, 42, 23, 42, 35, 23, 42, 34, 55 };
             for (int i = 0; i < heights.Length; i++) form.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
             form.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            form.Controls.Add(Label("01   CONEXIÓN Y ESTADO", 10, Muted), 0, 0);
+            form.Controls.Add(Label("01    TU CONFIGURACIÓN", 11, Color.FromArgb(195,180,247)), 0, 0);
             form.Controls.Add(Label("Token de tu cuenta", 10, Color.White), 0, 1);
-            form.Controls.Add(token, 0, 2); token.AccessibleName = "Token personal de Discord"; token.MaxLength = 2048;
+            form.Controls.Add(new StudioField(token), 0, 2); token.AccessibleName = "Token personal de Discord"; token.MaxLength = 2048;
             form.Controls.Add(Label("Solo en memoria. Se borra del campo al conectar.\nNo lo compartas por chat.", 9, Muted), 0, 3);
             form.Controls.Add(connect, 0, 4);
             form.Controls.Add(Label("Título del streaming", 10, Color.White), 0, 5);
-            form.Controls.Add(title, 0, 6); title.AccessibleName = "Título del streaming"; title.MaxLength = 128; title.Text = "Mi directo";
+            form.Controls.Add(new StudioField(title), 0, 6); title.AccessibleName = "Título del streaming"; title.MaxLength = 128; title.Text = "Mi directo";
             form.Controls.Add(Label("Enlace de Twitch o YouTube", 10, Color.White), 0, 7);
-            form.Controls.Add(url, 0, 8); url.AccessibleName = "Enlace del streaming"; url.MaxLength = 512;
+            form.Controls.Add(new StudioField(url), 0, 8); url.AccessibleName = "Enlace del streaming"; url.MaxLength = 512;
             form.Controls.Add(Label("Imagen de la actividad (opcional)", 10, Color.White), 0, 9);
             var imageRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            imageRow.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             imageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); imageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106));
-            imageRow.Controls.Add(imageUrl, 0, 0); imageRow.Controls.Add(loadImage, 1, 0);
+            imageRow.Controls.Add(new StudioField(imageUrl), 0, 0); imageRow.Controls.Add(loadImage, 1, 0);
             imageUrl.AccessibleName = "Enlace público de la imagen"; imageUrl.MaxLength = 2048;
             form.Controls.Add(imageRow, 0, 10);
             form.Controls.Add(Label("Pega el enlace directo de una imagen pública.\nDéjalo vacío para usar el icono por defecto.", 9, Muted), 0, 11);
             form.Controls.Add(Label("Application ID para imágenes externas", 10, Color.White), 0, 12);
-            form.Controls.Add(applicationId, 0, 13); applicationId.MaxLength = 20; applicationId.AccessibleName = "Application ID público de tu aplicación Discord";
+            form.Controls.Add(new StudioField(applicationId), 0, 13); applicationId.MaxLength = 20; applicationId.AccessibleName = "Application ID público de tu aplicación Discord";
             var logoRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
+            logoRow.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106)); logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); logoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
-            logoRow.Controls.Add(Label("Logo pequeño", 10, Color.White), 0, 0); logoRow.Controls.Add(logoChoice, 1, 0); logoRow.Controls.Add(logoPreview, 2, 0);
+            logoRow.Controls.Add(Label("Logo pequeño", 10, Color.White), 0, 0); logoRow.Controls.Add(logoPicker, 1, 0); logoRow.Controls.Add(logoPreview, 2, 0);
+            logoPicker.SelectionChanged += delegate { logoChoice.SelectedItem=logoPicker.Selected; };
             logoChoice.Items.AddRange(new object[] { "Twitch", "Kick", "Ninguno" }); logoChoice.SelectedIndex = 0;
             logoChoice.DrawMode = DrawMode.OwnerDrawFixed;
+            logoChoice.FlatStyle = FlatStyle.Flat;
+            logoChoice.BackColor = Color.FromArgb(29,33,49); logoChoice.ForeColor = Color.White;
             logoChoice.DrawItem += delegate(object sender, DrawItemEventArgs e) {
-                e.DrawBackground();
+                using (var background = new SolidBrush((e.State & DrawItemState.Selected) != 0 ? Color.FromArgb(77,56,124) : Color.FromArgb(29,33,49))) e.Graphics.FillRectangle(background,e.Bounds);
                 if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, Convert.ToString(logoChoice.Items[e.Index]), logoChoice.Font, e.Bounds,
-                    (e.State & DrawItemState.Selected) != 0 ? SystemColors.HighlightText : Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                    Color.White, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
                 e.DrawFocusRectangle();
             };
             logoChoice.SelectedIndexChanged += delegate { UpdateLogoPreview(); };
             form.Controls.Add(logoRow, 0, 14);
             var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 12, 0, 0) };
+            actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
             actions.Controls.Add(activate, 0, 0); actions.Controls.Add(deactivate, 1, 0); form.Controls.Add(actions, 0, 15);
-            columns.Controls.Add(form, 0, 0);
-            var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 10, BackColor = Card, Padding = new Padding(24), Margin = Padding.Empty };
-            int[] pHeights = { 30, 30, 42, 36, 116, 31, 48, 36, 68 };
-            for (int i = 0; i < pHeights.Length; i++) preview.RowStyles.Add(new RowStyle(SizeType.Absolute, pHeights[i]));
-            preview.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            preview.Controls.Add(Label("02   VISTA PREVIA", 10, Muted), 0, 0);
-            preview.Controls.Add(connection, 0, 1);
-            preview.Controls.Add(account, 0, 2);
-            var icon = Label("●  STREAMING", 17, Purple); preview.Controls.Add(icon, 0, 3);
-            preview.Controls.Add(picture, 0, 4);
-            preview.Controls.Add(activityState, 0, 5);
-            preview.Controls.Add(previewTitle, 0, 6);
-            preview.Controls.Add(previewUrl, 0, 7);
-            preview.Controls.Add(Label("La vista previa es orientativa. Discord puede ignorar la imagen o tardar en actualizarla.", 10, Muted), 0, 8);
-            preview.Controls.Add(Label("Al activar o quitar el estado, esta sesión pasa a «En línea».", 9, Muted), 0, 9);
-            columns.Controls.Add(preview, 1, 0);
+            var formCard = new StudioCard { Dock = DockStyle.Fill, Padding = new Padding(24), Margin = new Padding(0,0,18,0) }; formCard.Controls.Add(form); columns.Controls.Add(formCard, 0, 0);
+            var right = new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=2, Margin=Padding.Empty };
+            right.RowStyles.Add(new RowStyle(SizeType.Absolute,184)); right.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            hero.Margin = new Padding(0,0,0,16); right.Controls.Add(hero,0,0);
+            var previewCard = new StudioCard { Dock=DockStyle.Fill, Padding=new Padding(24), Margin=Padding.Empty };
+            var preview = new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=8, BackColor=Card, Margin=Padding.Empty };
+            int[] pHeights = { 24, 32, 132, 26, 40, 30, 47 };
+            foreach (int h in pHeights) preview.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
+            preview.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            connection.Font = new Font("Segoe UI",9,FontStyle.Bold);
+            preview.Controls.Add(connection,0,0); preview.Controls.Add(account,0,1);
+            picture.BackColor=Color.FromArgb(29,33,49);
+            preview.Controls.Add(picture,0,2); preview.Controls.Add(activityState,0,3);
+            previewTitle.Font = new Font("Segoe UI",15,FontStyle.Bold);
+            preview.Controls.Add(previewTitle,0,4); preview.Controls.Add(previewUrl,0,5);
+            preview.Controls.Add(Label("VISTA PREVIA\nDiscord puede mostrar la tarjeta de otra forma.",9,Muted),0,6);
+            preview.Controls.Add(Label("Al activar o quitar la presencia, la sesión pasa a En línea.",9,Muted),0,7);
+            previewCard.Controls.Add(preview); right.Controls.Add(previewCard,0,1); columns.Controls.Add(right,1,0);
+
             var notice = Label("CONEXIÓN NO OFICIAL\nAutomatizar una cuenta personal infringe las normas de Discord y puede provocar su suspensión.", 10, Color.FromArgb(235, 190, 121));
             notice.Margin = new Padding(0, 18, 0, 0); root.Controls.Add(notice, 0, 2);
             status.Padding = new Padding(0, 8, 0, 0); root.Controls.Add(status, 0, 3);
@@ -386,13 +402,22 @@ namespace StreamSwitch {
             connect.Click += async delegate { await ConnectClicked(); };
             activate.Click += async delegate { await ChangePresence(true); };
             deactivate.Click += async delegate { await ChangePresence(false); };
-            timer.Tick += delegate { UpdateButtons(); }; timer.Start();
+            timer.Tick += delegate { UpdateButtons(); hero.Live = session != null && session.Connected && session.Active; }; timer.Start();
             FormClosing += OnClosing;
             LoadPreferences(); UpdateLogoPreview(); UpdateButtons();
+            try { string uiPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"studio-settings.json"); if(File.Exists(uiPath))motion.Checked=Convert.ToBoolean(Protocol.Read(File.ReadAllText(uiPath))["animations"]); } catch { }
+            var fade = new System.Windows.Forms.Timer { Interval=16 };
+            fade.Tick += delegate { Opacity=Math.Min(1,Opacity+.09); if(Opacity>=1)fade.Stop(); };
+            Shown += delegate { if(motion.Checked && !Environment.GetCommandLineArgs().Contains("--preview")){Opacity=.1;fade.Start();} };
+            FormClosed += delegate { fade.Dispose(); timer.Dispose(); if(picture.Image!=null)picture.Image.Dispose(); if(logoPreview.Image!=null)logoPreview.Image.Dispose(); };
+        }
+        void SaveMotion() {
+            try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"studio-settings.json"),Protocol.Json(new { animations=motion.Checked })); } catch { }
         }
         void UpdateLogoPreview() {
             var old = logoPreview.Image; logoPreview.Image = null; if (old != null) old.Dispose();
             string selected = Convert.ToString(logoChoice.SelectedItem);
+            logoPicker.Selected=selected;logoPicker.Invalidate();
             if (selected == "Ninguno") return;
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logos", selected.ToLowerInvariant() + ".png");
             try { using (var source = Image.FromFile(path)) logoPreview.Image = new Bitmap(source); } catch { }
@@ -529,8 +554,10 @@ namespace StreamSwitch {
         [STAThread]
         static int Main(string[] args) {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            if(args.Contains("--make-icon")){StudioArt.SaveIcon(args[1]);return 0;}
             if (args.Contains("--self-test")) return SelfTests.Run(args.Length > 1 ? args[1] : "tests.txt");
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            if(args.Contains("--ui-test"))return SelfTests.RunUI(args[1]);
             if (args.Contains("--preview")) {
                 using (var preview = new MainForm()) {
                     preview.Show(); Application.DoEvents();

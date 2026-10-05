@@ -47,6 +47,32 @@ namespace StreamSwitch {
         public void Dispose() { Closed = true; }
     }
     internal static class SelfTests {
+        static byte[] Capture(System.Windows.Forms.Control control) {
+            using(var bitmap=new System.Drawing.Bitmap(control.Width,control.Height)) {
+                control.DrawToBitmap(bitmap,new System.Drawing.Rectangle(0,0,control.Width,control.Height));
+                using(var memory=new MemoryStream()){bitmap.Save(memory,System.Drawing.Imaging.ImageFormat.Png);return memory.ToArray();}
+            }
+        }
+        static void AnimateFrames() { for(int i=0;i<15;i++){System.Windows.Forms.Application.DoEvents();Thread.Sleep(20);} }
+        public static int RunUI(string path) {
+            try {
+                using(var host=new System.Windows.Forms.Form { ClientSize=new System.Drawing.Size(520,180) })
+                using(var hero=new StudioHero()) {
+                    host.Controls.Add(hero); host.Show(); System.Windows.Forms.Application.DoEvents();
+                    byte[] first=Capture(hero); AnimateFrames(); byte[] second=Capture(hero);
+                    Check(!first.SequenceEqual(second),"Hero animation produces distinct frames");
+                    hero.Motion=false; first=Capture(hero); AnimateFrames(); second=Capture(hero);
+                    Check(first.SequenceEqual(second),"Animation switch freezes the hero");
+                }
+                using(var picker=new StudioLogoPicker { Size=new System.Drawing.Size(300,34) }) {
+                    picker.CreateControl();picker.Selected="Twitch";byte[] twitch=Capture(picker);picker.Selected="Kick";byte[] kick=Capture(picker);
+                    Check(!twitch.SequenceEqual(kick),"Logo selector visibly distinguishes Twitch and Kick");
+                }
+                using(var icon=System.Drawing.Icon.ExtractAssociatedIcon(System.Windows.Forms.Application.ExecutablePath)) Check(icon!=null,"Executable contains an application icon");
+                using(var form=new MainForm()){form.Show();System.Windows.Forms.Application.DoEvents();Check(form.ClientSize.Width>=1100,"Studio window lays out at the intended size");}
+                report.Add("UI smoke checks passed; no credentials or Discord connection used.");File.WriteAllLines(path,report);return 0;
+            }catch(Exception ex){report.Add("FAIL "+ex.Message);File.WriteAllLines(path,report);return 1;}
+        }
         static readonly List<string> report = new List<string>();
         static void Check(bool condition, string label) { if (!condition) throw new Exception(label); report.Add("PASS " + label); }
         static void Reject(Action action, string label) {
