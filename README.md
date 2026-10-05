@@ -121,3 +121,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [SECURIT
 ## License
 
 Original source code is available under the [MIT License](LICENSE), copyright (c) 2026 Oxigeno. Third-party artwork is excluded; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Previous versions
+
+See the [version archive](CHANGELOG.md) for seven historical editions and their changes. Download their executable-and-source packages from [Releases](https://github.com/TaureO2/StreamSwitch/releases). Historical interfaces are in Spanish; this main branch contains the newer English edition.
